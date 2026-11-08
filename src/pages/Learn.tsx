@@ -9,6 +9,7 @@ import { motion } from "framer-motion";
 import {
   ArrowRight,
   Check,
+  Code2,
   Compass,
   Sparkles,
   Sprout,
@@ -23,6 +24,8 @@ export default function Learn() {
 
   const rowFor = (trackId: string) =>
     rows.find((row) => row.language === trackId);
+  const trackHref = (trackId: string) =>
+    trackId === "ai" ? "/learn/ai" : `/learn/${trackId}`;
   const totalXp = rows.reduce((sum, row) => sum + row.xp, 0);
   const doneCount = rows.reduce(
     (sum, row) => sum + row.completedLevels.length,
@@ -67,8 +70,8 @@ export default function Learn() {
           </h1>
           <p className="mt-3 text-lg text-muted-foreground">
             Four paths are open: Python from first line to classes, C and C++
-            down to pointers, and the ideas behind AI. One tiny concept at a
-            time.
+            down to pointers, and an AI target range. Learn one tiny concept,
+            then prove it.
           </p>
         </motion.div>
 
@@ -162,7 +165,8 @@ export default function Learn() {
                 <div className="mt-auto space-y-2">
                   <div className="flex items-center justify-between text-[11px] font-extrabold uppercase tracking-wider text-[var(--tone-ink)] opacity-75">
                     <span>
-                      {done}/{track.lessons.length} quests
+                      {done}/{track.lessons.length}{" "}
+                      {track.id === "ai" ? "targets" : "quests"}
                     </span>
                     <span>{track.totalXp} XP</span>
                   </div>
@@ -178,12 +182,18 @@ export default function Learn() {
                   asChild
                   className="clay-btn w-full rounded-xl bg-[var(--tone-ink)] font-extrabold text-white hover:bg-[var(--tone-ink)]"
                 >
-                  <Link to={`/learn/${track.id}`}>
-                    {complete
-                      ? "Replay path"
-                      : done > 0
-                        ? "Keep going"
-                        : `Play ${track.name}`}
+                  <Link to={trackHref(track.id)}>
+                    {track.id === "ai"
+                      ? complete
+                        ? "Replay range"
+                        : done > 0
+                          ? "Back to range"
+                          : "Play AI range"
+                      : complete
+                        ? "Replay path"
+                        : done > 0
+                          ? "Keep going"
+                          : `Play ${track.name}`}
                     <ArrowRight className="size-4" />
                   </Link>
                 </Button>
@@ -220,8 +230,43 @@ export default function Learn() {
             variant="outline"
             className="clay-btn shrink-0 rounded-xl border-0 bg-white font-extrabold"
           >
-            <Link to={nextTrack ? `/learn/${nextTrack.id}` : "/learn/python"}>
+            <Link to={nextTrack ? trackHref(nextTrack.id) : "/learn/python"}>
               {nextLesson ? "Jump in" : "Replay Python"}
+              <ArrowRight className="size-4" />
+            </Link>
+          </Button>
+        </motion.div>
+
+        {/* Code Lab */}
+        <motion.div
+          initial={{ opacity: 0, y: 18 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ duration: 0.5, delay: 0.3 }}
+          className="clay-tile tone-sky mt-8 flex flex-col items-start justify-between gap-5 p-6 sm:flex-row sm:items-center sm:p-7"
+        >
+          <div className="flex items-start gap-4">
+            <span className="grid size-12 shrink-0 place-items-center rounded-2xl bg-white/60 text-[var(--clay-sky-ink)] shadow-[inset_0_-4px_8px_rgba(60,50,90,0.12)]">
+              <Code2 className="size-5" strokeWidth={2.4} />
+            </span>
+            <div>
+              <p className="text-[11px] font-extrabold uppercase tracking-widest text-[var(--clay-sky-ink)] opacity-70">
+                No multiple choice
+              </p>
+              <p className="font-display text-xl font-semibold text-[var(--clay-sky-ink)]">
+                Code Lab — write and run a whole Python program
+              </p>
+              <p className="mt-1 text-sm font-semibold text-[var(--clay-sky-ink)] opacity-80">
+                A real editor, a real console. Nothing installs and nothing
+                leaves your browser.
+              </p>
+            </div>
+          </div>
+          <Button
+            asChild
+            className="clay-btn shrink-0 rounded-xl bg-[var(--clay-sky-ink)] font-extrabold text-white hover:bg-[var(--clay-sky-ink)]"
+          >
+            <Link to="/lab">
+              Open Code Lab
               <ArrowRight className="size-4" />
             </Link>
           </Button>

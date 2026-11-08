@@ -7,7 +7,12 @@ import { C_LESSONS } from "@/lib/tracks/c";
 import { CPP_LESSONS } from "@/lib/tracks/cpp";
 import type { Lesson, Unit } from "@/lib/track-types";
 
-export type { Challenge, Lesson, Unit } from "@/lib/track-types";
+export type {
+  ArcadeChallenge,
+  Challenge,
+  Lesson,
+  Unit,
+} from "@/lib/track-types";
 
 export type LanguageTrack = {
   id: string;
@@ -73,9 +78,9 @@ const TRACK_META = [
     id: "ai",
     name: "AI",
     emoji: "🤖",
-    tagline: "Learn the ideas",
+    tagline: "Arcade range",
     blurb:
-      "From labelled examples to prompts: understand how modern AI actually works.",
+      "Learn how AI works by shooting the right target in a fast clay range. Aim, fire, understand.",
     tone: "tone-lilac",
     codeLabel: "ai_lab.py",
     concepts: ["datasets", "labels", "tokens", "prompts", "evaluation"],
@@ -676,6 +681,62 @@ export const PYTHON_LESSONS: Lesson[] = [
     },
     xp: 45,
     minutes: 6,
+  },
+  {
+    id: "fizzbuzz",
+    unit: "Build it for real",
+    title: "FizzBuzz, fully coded",
+    icon: "🎮",
+    summary: "Write a complete program from scratch",
+    explanation: [
+      "Time to write a whole program. FizzBuzz prints the numbers 1 to 15, but replaces multiples of 3 with Fizz, multiples of 5 with Buzz, and multiples of both with FizzBuzz.",
+      "The % operator gives the remainder of a division. n % 3 == 0 means n divides evenly by 3. Check the both-case first, otherwise a multiple of 15 would stop at Fizz.",
+    ],
+    example: {
+      code: 'for n in range(1, 16):\n    if n % 15 == 0:\n        print("FizzBuzz")\n    elif n % 3 == 0:\n        print("Fizz")\n    elif n % 5 == 0:\n        print("Buzz")\n    else:\n        print(n)',
+      output:
+        "1\n2\nFizz\n4\nBuzz\nFizz\n7\n8\nFizz\nBuzz\n11\nFizz\n13\n14\nFizzBuzz",
+    },
+    challenge: {
+      kind: "code",
+      prompt:
+        "Write a full program that prints 1 to 15, one per line. Print Fizz for multiples of 3, Buzz for multiples of 5, and FizzBuzz for multiples of both.",
+      starter:
+        "# Print the numbers 1 to 15 with FizzBuzz rules.\nfor n in range(1, 16):\n    # your code here\n    pass",
+      expectedOutput:
+        "1\n2\nFizz\n4\nBuzz\nFizz\n7\n8\nFizz\nBuzz\n11\nFizz\n13\n14\nFizzBuzz",
+      explanation:
+        "% gives the remainder. Testing n % 15 == 0 first catches every multiple of both 3 and 5, then the separate checks handle Fizz and Buzz. The final else prints the plain number.",
+    },
+    xp: 60,
+    minutes: 8,
+  },
+  {
+    id: "score-report",
+    unit: "Build it for real",
+    title: "Score report",
+    icon: "📊",
+    summary: "Loop, total, divide and format a report",
+    explanation: [
+      "This program turns a list of scores into a small report. Start total at 0, add each score inside a loop, then divide by len(scores) to get the average.",
+      "In an f-string, {average:.1f} shows one digit after the decimal point. Without it, Python might print 20.0 anyway — but formatting makes the output predictable.",
+    ],
+    example: {
+      code: 'scores = [10, 20, 30]\ntotal = 0\nfor score in scores:\n    total += score\naverage = total / len(scores)\nprint(f"Total: {total}")\nprint(f"Average: {average:.1f}")',
+      output: "Total: 60\nAverage: 20.0",
+    },
+    challenge: {
+      kind: "code",
+      prompt:
+        "Finish the program so it prints exactly “Total: 60”, then “Average: 20.0”.",
+      starter:
+        "scores = [10, 20, 30]\ntotal = 0\n\n# Add every score to total.\n\n# Print the total, then the average with one decimal.",
+      expectedOutput: "Total: 60\nAverage: 20.0",
+      explanation:
+        "total += score adds each value in the list. Dividing total by len(scores) gives the average, and the f-string prints both lines exactly as requested.",
+    },
+    xp: 55,
+    minutes: 7,
   },
 ];
 

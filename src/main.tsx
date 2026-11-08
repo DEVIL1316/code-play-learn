@@ -14,6 +14,8 @@ const Landing = lazy(() => import("./pages/Landing.tsx"));
 const AuthPage = lazy(() => import("./pages/Auth.tsx"));
 const Learn = lazy(() => import("./pages/Learn.tsx"));
 const QuestGame = lazy(() => import("./pages/QuestGame.tsx"));
+const AIShooter = lazy(() => import("./pages/AIShooter.tsx"));
+const CodeLab = lazy(() => import("./pages/CodeLab.tsx"));
 const Dashboard = lazy(() => import("./pages/Dashboard.tsx"));
 const NotFound = lazy(() => import("./pages/NotFound.tsx"));
 
@@ -138,6 +140,17 @@ createRoot(document.getElementById("root")!).render(
                 }
               />
               <Route
+                path="/learn/ai"
+                element={
+                  <RequireAuth
+                    title="Sign in to enter the AI range"
+                    description="Hits, XP and explanations are saved to your account."
+                  >
+                    <AIShooter />
+                  </RequireAuth>
+                }
+              />
+              <Route
                 path="/learn/:trackId"
                 element={
                   <RequireAuth
@@ -145,6 +158,17 @@ createRoot(document.getElementById("root")!).render(
                     description="Save your XP and pick up exactly where you left off."
                   >
                     <QuestGame />
+                  </RequireAuth>
+                }
+              />
+              <Route
+                path="/lab"
+                element={
+                  <RequireAuth
+                    title="Sign in to open Code Lab"
+                    description="Write and run full Python programs in your browser."
+                  >
+                    <CodeLab />
                   </RequireAuth>
                 }
               />

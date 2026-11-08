@@ -7,6 +7,7 @@ import {
   type LanguageTrack,
   type Lesson,
 } from "@/lib/course";
+import { outputsMatch, preloadPython, runPython } from "@/lib/python";
 import { cn } from "@/lib/utils";
 import { useMutation, useQuery } from "convex/react";
 import { AnimatePresence, motion } from "framer-motion";
@@ -15,6 +16,7 @@ import {
   ArrowRight,
   BookOpen,
   Check,
+  Code2,
   Lightbulb,
   Loader2,
   Play,
@@ -23,7 +25,7 @@ import {
   Trophy,
   X,
 } from "lucide-react";
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { Link, Navigate, useParams } from "react-router";
 
 type Phase = "lesson" | "challenge";
@@ -46,6 +48,7 @@ function unitTone(units: LanguageTrack["units"], unit: string) {
 
 function answerText(challenge: Challenge) {
   if (challenge.kind === "order") return challenge.lines.join("  →  ");
+  if (challenge.kind === "code") return challenge.expectedOutput;
   return challenge.options[challenge.answer];
 }
 
@@ -94,6 +97,13 @@ function TrackGame({ track }: { track: LanguageTrack }) {
   const [selected, setSelected] = useState<number | null>(null);
   const [ordered, setOrdered] = useState<number[]>([]);
   const [replay, setReplay] = useState(false);
+  const [code, setCode] = useState<string | null>(null);
+  const [runResult, setRunResult] = useState<{
+    output: string;
+    error: string | null;
+  } | null>(null);
+  const [running, setRunning] = useState(false);
+  const runToken = useRef(0);
 
   const completedIds = progress?.completedLevels ?? [];
   const xp = progress?.xp ?? 0;
@@ -112,6 +122,8 @@ function TrackGame({ track }: { track: LanguageTrack }) {
   const finished = currentIndex >= track.lessons.length;
   const lesson: Lesson | null = finished ? null : track.lessons[currentIndex];
   const challenge = lesson?.challenge ?? null;
+  const codeStarter = challenge?.kind === "code" ? challenge.starter : "";
+  const editorValue = code ?? codeStarter;
 
   /* Shuffled presentation order for "arrange the lines" challenges. */
   const orderPool = useMemo(() => {
@@ -128,14 +140,22 @@ function TrackGame({ track }: { track: LanguageTrack }) {
       : selected !== null);
 
   function resetPlay(nextIndex: number, nextPhase: Phase = "lesson") {
+    runToken.current += 1;
     setActiveIndex(nextIndex);
     setPhase(nextPhase);
     setStatus("idle");
     setSelected(null);
     setOrdered([]);
     setReplay(false);
+    setCode(null);
+    setRunResult(null);
+    setRunning(false);
     window.scrollTo({ top: 0, behavior: "smooth" });
   }
+
+  useEffect(() => {
+    if (challenge?.kind === "code") preloadPython();
+  }, [challenge?.kind]);
 
   function saveLevel(target: Lesson) {
     completeLevel({
@@ -147,6 +167,7 @@ function TrackGame({ track }: { track: LanguageTrack }) {
 
   function isCorrect() {
     if (!challenge) return false;
+    if (challenge.kind === "code") return false;
     if (challenge.kind === "order") {
       return (
         ordered.length === challenge.lines.length &&
@@ -157,10 +178,35 @@ function TrackGame({ track }: { track: LanguageTrack }) {
   }
 
   function handleCheck() {
-    if (!challenge || !lesson || !canCheck) return;
+    if (!challenge || challenge.kind === "code" || !lesson || !canCheck) return;
     const correct = isCorrect();
     setStatus(correct ? "correct" : "wrong");
     if (correct) saveLevel(lesson);
+  }
+
+  async function handleRun() {
+    if (!challenge || challenge.kind !== "code" || !lesson || running) return;
+    const token = ++runToken.current;
+    setRunning(true);
+    setStatus("idle");
+
+    let result;
+    try {
+      result = await runPython(editorValue);
+    } catch {
+      result = {
+        output: "",
+        error: "Python could not run that program. Try again.",
+      };
+    }
+    if (token !== runToken.current) return;
+
+    setRunResult(result);
+    setRunning(false);
+    const passed =
+      !result.error && outputsMatch(result.output, challenge.expectedOutput);
+    setStatus(passed ? "correct" : "wrong");
+    if (passed) saveLevel(lesson);
   }
 
   function goNext() {
@@ -545,6 +591,135 @@ function TrackGame({ track }: { track: LanguageTrack }) {
                     </div>
                   )}
 
+                {/* code challenge */}
+                {challenge.kind === "code" && (
+                  <div className="mt-4 space-y-3">
+                    <div className="overflow-hidden rounded-2xl bg-[var(--clay-ink)] shadow-[inset_0_8px_20px_-12px_rgba(0,0,0,0.8)]">
+                      <div className="flex items-center justify-between gap-3 border-b border-white/10 px-4 py-2.5">
+                        <span className="flex items-center gap-2 font-mono text-[10px] font-bold uppercase tracking-widest text-white/45">
+                          <Code2 className="size-3.5" />
+                          python · runs in your browser
+                        </span>
+                        <button
+                          type="button"
+                          onClick={() => {
+                            runToken.current += 1;
+                            setCode(null);
+                            setRunResult(null);
+                            setStatus("idle");
+                            setRunning(false);
+                          }}
+                          className="flex items-center gap-1 text-[10px] font-extrabold uppercase tracking-wider text-white/50 transition hover:text-white"
+                        >
+                          <RotateCcw className="size-3" />
+                          Reset code
+                        </button>
+                      </div>
+                      <textarea
+                        value={editorValue}
+                        onChange={(event) => {
+                          setCode(event.target.value);
+                          if (status === "wrong") setStatus("idle");
+                        }}
+                        onKeyDown={(event) => {
+                          if (event.key !== "Tab") return;
+                          event.preventDefault();
+                          const element = event.currentTarget;
+                          const start = element.selectionStart;
+                          const end = element.selectionEnd;
+                          setCode(
+                            `${editorValue.slice(0, start)}    ${editorValue.slice(end)}`,
+                          );
+                          requestAnimationFrame(() => {
+                            element.selectionStart = start + 4;
+                            element.selectionEnd = start + 4;
+                          });
+                        }}
+                        readOnly={status === "correct"}
+                        spellCheck={false}
+                        rows={10}
+                        aria-label="Python code editor"
+                        className="w-full resize-y bg-transparent px-4 py-3 font-mono text-[13px] leading-6 text-[oklch(0.94_0.02_95)] outline-none"
+                      />
+                    </div>
+
+                    <details className="clay-inset rounded-xl px-4 py-3">
+                      <summary className="cursor-pointer text-[11px] font-extrabold uppercase tracking-widest text-muted-foreground">
+                        Show target output
+                      </summary>
+                      <pre className="mt-2 max-h-40 overflow-auto whitespace-pre-wrap font-mono text-xs leading-6 text-foreground/80">
+                        {challenge.expectedOutput}
+                      </pre>
+                    </details>
+
+                    <div className="flex flex-wrap items-center gap-3">
+                      <Button
+                        onClick={handleRun}
+                        disabled={running || status === "correct"}
+                        size="lg"
+                        className="clay-btn h-11 rounded-xl px-5 font-extrabold"
+                      >
+                        {running ? (
+                          <Loader2 className="size-4 animate-spin" />
+                        ) : (
+                          <Play className="size-4" />
+                        )}
+                        {running
+                          ? "Running…"
+                          : runResult
+                            ? "Run again"
+                            : "Run program"}
+                      </Button>
+                      <span className="text-xs font-bold text-muted-foreground">
+                        {running
+                          ? "The first run loads Python — this can take a moment."
+                          : "Edit freely. Run as many times as you need."}
+                      </span>
+                    </div>
+
+                    {runResult && (
+                      <div
+                        className={cn(
+                          "rounded-2xl p-4",
+                          runResult.error
+                            ? "bg-[var(--clay-peach)]"
+                            : "clay-inset",
+                        )}
+                      >
+                        <div className="flex items-center justify-between gap-3">
+                          <p
+                            className={cn(
+                              "text-[10px] font-extrabold uppercase tracking-widest",
+                              runResult.error
+                                ? "text-[var(--clay-peach-ink)]"
+                                : "text-muted-foreground",
+                            )}
+                          >
+                            Console
+                          </p>
+                          {!runResult.error && status === "correct" && (
+                            <span className="flex items-center gap-1 text-[10px] font-extrabold uppercase tracking-widest text-[var(--clay-mint-ink)]">
+                              <Check className="size-3" strokeWidth={3.5} />
+                              Matches target
+                            </span>
+                          )}
+                        </div>
+                        <pre
+                          className={cn(
+                            "mt-2 max-h-52 overflow-auto whitespace-pre-wrap font-mono text-xs leading-6",
+                            runResult.error
+                              ? "text-[var(--clay-peach-ink)]"
+                              : "text-foreground/85",
+                          )}
+                        >
+                          {runResult.error ??
+                            (runResult.output || "(no output)")}
+                        </pre>
+                      </div>
+                    )}
+                  </div>
+                )}
+
                 {/* order challenge */}
                 {challenge.kind === "order" && (
                   <div className="mt-5 space-y-4">
@@ -617,7 +792,7 @@ function TrackGame({ track }: { track: LanguageTrack }) {
                 )}
 
                 {/* answer options */}
-                {challenge.kind !== "order" && (
+                {(challenge.kind === "choice" || challenge.kind === "blank") && (
                   <div
                     className={cn(
                       "mt-5 grid gap-2.5",
@@ -664,7 +839,7 @@ function TrackGame({ track }: { track: LanguageTrack }) {
                 )}
 
                 {/* actions */}
-                {status === "idle" && (
+                {status === "idle" && challenge.kind !== "code" && (
                   <div className="mt-6 flex flex-wrap items-center gap-3">
                     <Button
                       onClick={handleCheck}
@@ -719,15 +894,21 @@ function TrackGame({ track }: { track: LanguageTrack }) {
                               ? replay
                                 ? "Nailed it! Replay complete."
                                 : `Nailed it! +${lesson.xp} XP`
-                              : "Not quite — here's the why."}
+                              : challenge.kind === "code"
+                                ? "Not quite yet — compare the console."
+                                : "Not quite — here's the why."}
                           </p>
                           {status === "wrong" && (
-                            <p className="text-xs font-bold text-[var(--clay-peach-ink)] opacity-80">
-                              Correct answer:{" "}
-                              <span className="font-mono">
+                            <div className="max-w-md text-xs font-bold text-[var(--clay-peach-ink)] opacity-80">
+                              <p>
+                                {challenge.kind === "code"
+                                  ? "Target output:"
+                                  : "Correct answer:"}
+                              </p>
+                              <pre className="mt-1 whitespace-pre-wrap font-mono">
                                 {answerText(challenge)}
-                              </span>
-                            </p>
+                              </pre>
+                            </div>
                           )}
                         </div>
                       </div>

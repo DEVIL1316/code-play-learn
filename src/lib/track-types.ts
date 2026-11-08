@@ -22,7 +22,21 @@ export type Challenge =
       prompt: string;
       lines: string[];
       explanation: string;
+    }
+  | {
+      kind: "code";
+      prompt: string;
+      starter: string;
+      expectedOutput: string;
+      explanation: string;
     };
+
+/** Optional arcade configuration so a lesson can be played as a shooting round. */
+export type ArcadeChallenge = {
+  instruction: string;
+  targets: string[];
+  answer: number;
+};
 
 export type Lesson = {
   id: string;
@@ -33,6 +47,7 @@ export type Lesson = {
   explanation: string[];
   example: { code: string; output: string };
   challenge: Challenge;
+  arcade?: ArcadeChallenge;
   xp: number;
   minutes: number;
 };

@@ -8,6 +8,7 @@ import {
   ArrowRight,
   BookOpen,
   Check,
+  Code2,
   Gamepad2,
   Lightbulb,
   Sparkles,
@@ -24,13 +25,12 @@ const fadeUp = {
 
 export default function Landing() {
   const { isAuthenticated } = useAuth();
-  const hrefFor = (trackId?: string) => {
-    const target = trackId ? `/learn/${trackId}` : "/learn";
-    return isAuthenticated
-      ? target
-      : `/auth?returnTo=${encodeURIComponent(target)}`;
-  };
-  const startHref = hrefFor();
+  const withAuth = (path: string) =>
+    isAuthenticated ? path : `/auth?returnTo=${encodeURIComponent(path)}`;
+  const trackHref = (trackId: string) =>
+    withAuth(trackId === "ai" ? "/learn/ai" : `/learn/${trackId}`);
+  const startHref = withAuth("/learn");
+  const labHref = withAuth("/lab");
 
   return (
     <div className="relative min-h-screen overflow-x-hidden">
@@ -44,20 +44,25 @@ export default function Landing() {
       <header className="sticky top-0 z-30 border-b border-white/50 bg-background/75 backdrop-blur-xl">
         <div className="mx-auto flex w-full max-w-6xl items-center justify-between gap-4 px-4 py-4 sm:px-6">
           <Brand />
-          <nav className="hidden items-center gap-1 md:flex">
-            {[
-              { href: "#paths", label: "Paths" },
-              { href: "#how", label: "How it works" },
-              { href: "#sample", label: "Sample quest" },
-            ].map((item) => (
-              <a
-                key={item.href}
-                href={item.href}
+          <nav className="hidden items-center gap-1 md:flex">              {[
+                { href: "#paths", label: "Paths" },
+                { href: "#how", label: "How it works" },
+                { href: "#sample", label: "Sample quest" },
+              ].map((item) => (
+                <a
+                  key={item.href}
+                  href={item.href}
+                  className="rounded-full px-4 py-2 text-sm font-bold text-muted-foreground transition hover:bg-white/60 hover:text-foreground"
+                >
+                  {item.label}
+                </a>
+              ))}
+              <Link
+                to={labHref}
                 className="rounded-full px-4 py-2 text-sm font-bold text-muted-foreground transition hover:bg-white/60 hover:text-foreground"
               >
-                {item.label}
-              </a>
-            ))}
+                Code Lab
+              </Link>
           </nav>
           <div className="flex items-center gap-2">
             {!isAuthenticated && (
@@ -302,8 +307,10 @@ export default function Landing() {
                       asChild
                       className="clay-btn w-full rounded-xl bg-[var(--tone-ink)] font-extrabold text-white hover:bg-[var(--tone-ink)]"
                     >
-                      <Link to={hrefFor(track.id)}>
-                        {track.lessons.length} quests
+                      <Link to={trackHref(track.id)}>
+                        {track.id === "ai"
+                          ? `${track.lessons.length} targets`
+                          : `${track.lessons.length} quests`}
                         <ArrowRight className="size-4" />
                       </Link>
                     </Button>
@@ -312,6 +319,77 @@ export default function Landing() {
               );
             })}
           </div>
+        </section>
+
+        {/* Code Lab */}
+        <section className="mx-auto w-full max-w-6xl px-4 pb-20 sm:px-6">
+          <motion.div
+            {...fadeUp}
+            className="clay-tile tone-sky grid gap-8 p-7 sm:p-10 lg:grid-cols-[1.02fr_0.98fr] lg:items-center"
+          >
+            <div>
+              <span className="inline-flex items-center gap-2 rounded-full bg-white/55 px-3.5 py-1.5 text-[11px] font-extrabold uppercase tracking-widest text-[var(--clay-sky-ink)]">
+                <Code2 className="size-3.5" />
+                Code Lab · real Python
+              </span>
+              <h2 className="mt-4 text-4xl font-semibold text-[var(--clay-sky-ink)] sm:text-5xl">
+                Not just quizzes. Write the whole program.
+              </h2>
+              <p className="mt-4 text-base font-semibold leading-relaxed text-[var(--clay-sky-ink)] opacity-80">
+                Open a real editor, write any Python you like, and run it right
+                in the browser. The console shows the output — and the errors,
+                which are where the learning happens.
+              </p>
+              <ul className="mt-6 space-y-3">
+                {[
+                  "A full code editor with tab support",
+                  "Real Python 3 output and tracebacks",
+                  "Starter programs for loops, classes and reports",
+                ].map((item) => (
+                  <li key={item} className="flex items-start gap-3">
+                    <span className="mt-0.5 grid size-6 shrink-0 place-items-center rounded-full bg-white/65 text-[var(--clay-sky-ink)]">
+                      <Check className="size-3.5" strokeWidth={3.5} />
+                    </span>
+                    <span className="text-sm font-bold text-[var(--clay-sky-ink)]">
+                      {item}
+                    </span>
+                  </li>
+                ))}
+              </ul>
+              <Button
+                asChild
+                size="lg"
+                className="clay-btn mt-7 h-12 rounded-2xl bg-[var(--clay-sky-ink)] px-6 font-extrabold text-white hover:bg-[var(--clay-sky-ink)]"
+              >
+                <Link to={labHref}>
+                  Open Code Lab
+                  <ArrowRight className="size-4" />
+                </Link>
+              </Button>
+            </div>
+
+            <div className="code-well overflow-hidden p-0">
+              <div className="flex items-center gap-1.5 border-b border-white/10 px-4 py-2.5">
+                <span className="size-2.5 rounded-full bg-[oklch(0.78_0.13_25)]" />
+                <span className="size-2.5 rounded-full bg-[oklch(0.88_0.11_95)]" />
+                <span className="size-2.5 rounded-full bg-[oklch(0.8_0.1_165)]" />
+                <span className="ml-auto font-mono text-[10px] font-bold uppercase tracking-widest text-white/40">
+                  playground.py
+                </span>
+              </div>
+              <pre className="overflow-x-auto px-4 py-4 font-mono text-[13px] leading-7 text-[oklch(0.94_0.02_95)]">
+                {'for n in range(1, 6):\n    if n % 2 == 0:\n        print(f"{n} is even")\n    else:\n        print(f"{n} is odd")'}
+              </pre>
+              <div className="mx-4 mb-4 rounded-xl bg-black/25 px-3 py-2.5">
+                <p className="font-mono text-[10px] font-bold uppercase tracking-widest text-white/40">
+                  Output
+                </p>
+                <pre className="mt-1 font-mono text-xs leading-6 text-[oklch(0.9_0.06_95)]">
+                  {"1 is odd\n2 is even\n3 is odd\n4 is even\n5 is odd"}
+                </pre>
+              </div>
+            </div>
+          </motion.div>
         </section>
 
         {/* How it works */}
@@ -509,6 +587,7 @@ export default function Landing() {
           <div className="flex items-center gap-4 text-xs font-bold text-muted-foreground">
             <a href="#paths" className="hover:text-foreground">Paths</a>
             <a href="#how" className="hover:text-foreground">How it works</a>
+            <Link to={labHref} className="hover:text-foreground">Code Lab</Link>
             <Link to={startHref} className="hover:text-foreground">Play</Link>
           </div>
         </div>
