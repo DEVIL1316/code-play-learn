@@ -13,7 +13,7 @@ import "./index.css";
 const Landing = lazy(() => import("./pages/Landing.tsx"));
 const AuthPage = lazy(() => import("./pages/Auth.tsx"));
 const Learn = lazy(() => import("./pages/Learn.tsx"));
-const PythonQuest = lazy(() => import("./pages/PythonQuest.tsx"));
+const QuestGame = lazy(() => import("./pages/QuestGame.tsx"));
 const Dashboard = lazy(() => import("./pages/Dashboard.tsx"));
 const NotFound = lazy(() => import("./pages/NotFound.tsx"));
 
@@ -138,13 +138,13 @@ createRoot(document.getElementById("root")!).render(
                 }
               />
               <Route
-                path="/learn/python"
+                path="/learn/:trackId"
                 element={
                   <RequireAuth
-                    title="Sign in to play Python quests"
+                    title="Sign in to play quests"
                     description="Save your XP and pick up exactly where you left off."
                   >
-                    <PythonQuest />
+                    <QuestGame />
                   </RequireAuth>
                 }
               />

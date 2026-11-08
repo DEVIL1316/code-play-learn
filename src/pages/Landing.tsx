@@ -1,7 +1,7 @@
 import { Brand } from "@/components/Brand";
 import { Button } from "@/components/ui/button";
 import { useAuth } from "@/hooks/use-auth";
-import { LANGUAGE_TRACKS, PYTHON_TOTAL_XP } from "@/lib/course";
+import { LANGUAGE_TRACKS, TOTAL_QUESTS, TOTAL_XP } from "@/lib/course";
 import { cn } from "@/lib/utils";
 import { motion } from "framer-motion";
 import {
@@ -10,7 +10,6 @@ import {
   Check,
   Gamepad2,
   Lightbulb,
-  Lock,
   Sparkles,
   Sprout,
 } from "lucide-react";
@@ -25,9 +24,13 @@ const fadeUp = {
 
 export default function Landing() {
   const { isAuthenticated } = useAuth();
-  const startHref = isAuthenticated
-    ? "/learn"
-    : `/auth?returnTo=${encodeURIComponent("/learn")}`;
+  const hrefFor = (trackId?: string) => {
+    const target = trackId ? `/learn/${trackId}` : "/learn";
+    return isAuthenticated
+      ? target
+      : `/auth?returnTo=${encodeURIComponent(target)}`;
+  };
+  const startHref = hrefFor();
 
   return (
     <div className="relative min-h-screen overflow-x-hidden">
@@ -82,7 +85,7 @@ export default function Landing() {
           >
             <span className="clay-soft inline-flex items-center gap-2 rounded-full px-4 py-2 text-xs font-extrabold uppercase tracking-[0.14em] text-[var(--clay-mint-ink)]">
               <Sprout className="size-4" />
-              Beginner-first · Python
+              Beginner-first · 4 paths
             </span>
             <h1 className="mt-6 text-balance font-display text-5xl font-semibold leading-[1.02] sm:text-6xl lg:text-[4.2rem]">
               Learn to code.
@@ -91,7 +94,7 @@ export default function Landing() {
               </span>
             </h1>
             <p className="mt-6 max-w-xl text-lg leading-relaxed text-muted-foreground">
-              ClayCode turns Python basics into {LANGUAGE_TRACKS[0].quests} bite-size
+              ClayCode turns Python, C, C++ and AI into {TOTAL_QUESTS} bite-size
               quests. Read a tiny explanation, play the challenge, and finally
               understand what every line actually does.
             </p>
@@ -102,7 +105,7 @@ export default function Landing() {
                 className="clay-btn h-14 rounded-2xl px-7 text-base font-extrabold"
               >
                 <Link to={startHref}>
-                  Start the Python path
+                  Start learning free
                   <ArrowRight className="size-5" />
                 </Link>
               </Button>
@@ -120,9 +123,9 @@ export default function Landing() {
             </div>
             <dl className="mt-10 flex flex-wrap gap-x-8 gap-y-4">
               {[
-                { value: "14", label: "playable quests" },
-                { value: "0", label: "setup required" },
-                { value: `${PYTHON_TOTAL_XP}`, label: "XP to earn" },
+                { value: `${TOTAL_QUESTS}`, label: "playable quests" },
+                { value: "4", label: "coding paths" },
+                { value: `${TOTAL_XP}`, label: "XP to earn" },
               ].map((stat) => (
                 <div key={stat.label}>
                   <dt className="font-display text-2xl font-semibold">
@@ -219,13 +222,13 @@ export default function Landing() {
           <div className="mx-auto flex max-w-6xl flex-wrap items-center justify-center gap-2.5 px-4">
             {[
               "print()",
-              "variables",
-              "numbers",
-              "f-strings",
-              "if / else",
-              "loops",
-              "functions",
-              "lists",
+              "dicts",
+              "classes",
+              "C types",
+              "pointers",
+              "vectors",
+              "prompts",
+              "embeddings",
             ].map((concept) => (
               <span
                 key={concept}
@@ -244,17 +247,17 @@ export default function Landing() {
               Choose your path
             </span>
             <h2 className="mt-3 text-4xl font-semibold sm:text-5xl">
-              Four languages. One friendly start.
+              Four paths. One friendly start.
             </h2>
             <p className="mt-4 text-lg text-muted-foreground">
-              Version one opens the Python path. C, C++ and AI are still being
-              kneaded — your progress in Python will be waiting.
+              All four are open now: {TOTAL_QUESTS} explained quests across Python,
+              C, C++ and AI. Every path saves progress separately, so you can
+              wander and come back.
             </p>
           </motion.div>
 
           <div className="mt-10 grid gap-5 sm:grid-cols-2 lg:grid-cols-4">
             {LANGUAGE_TRACKS.map((track, index) => {
-              const open = track.status === "open";
               return (
                 <motion.article
                   key={track.id}
@@ -263,9 +266,8 @@ export default function Landing() {
                   viewport={{ once: true, amount: 0.2 }}
                   transition={{ duration: 0.45, delay: index * 0.07 }}
                   className={cn(
-                    "clay-tile flex flex-col gap-4 p-6",
+                    "clay-tile clay-lift flex flex-col gap-4 p-6",
                     track.tone,
-                    open ? "clay-lift" : "opacity-95",
                   )}
                 >
                   <div className="flex items-start justify-between">
@@ -273,7 +275,7 @@ export default function Landing() {
                       {track.emoji}
                     </span>
                     <span className="flex items-center gap-1 rounded-full bg-white/55 px-2.5 py-1 text-[10px] font-extrabold uppercase tracking-wider text-[var(--tone-ink)]">
-                      {open ? <Sparkles className="size-3" /> : <Lock className="size-3" />}
+                      <Sparkles className="size-3" />
                       {track.tagline}
                     </span>
                   </div>
@@ -296,21 +298,15 @@ export default function Landing() {
                     ))}
                   </div>
                   <div className="mt-auto pt-2">
-                    {open ? (
-                      <Button
-                        asChild
-                        className="clay-btn w-full rounded-xl bg-[var(--tone-ink)] font-extrabold text-white hover:bg-[var(--tone-ink)]"
-                      >
-                        <Link to={startHref}>
-                          {track.quests} quests
-                          <ArrowRight className="size-4" />
-                        </Link>
-                      </Button>
-                    ) : (
-                      <div className="flex h-9 items-center justify-center rounded-xl bg-white/45 text-xs font-extrabold uppercase tracking-wider text-[var(--tone-ink)] opacity-80">
-                        Coming soon
-                      </div>
-                    )}
+                    <Button
+                      asChild
+                      className="clay-btn w-full rounded-xl bg-[var(--tone-ink)] font-extrabold text-white hover:bg-[var(--tone-ink)]"
+                    >
+                      <Link to={hrefFor(track.id)}>
+                        {track.lessons.length} quests
+                        <ArrowRight className="size-4" />
+                      </Link>
+                    </Button>
                   </div>
                 </motion.article>
               );
@@ -475,14 +471,14 @@ export default function Landing() {
             />
             <div className="relative mx-auto max-w-2xl">
               <span className="clay-soft mx-auto grid size-16 place-items-center rounded-3xl bg-white/70 text-4xl">
-                🐍
+                🧶
               </span>
               <h2 className="mt-6 text-4xl font-semibold text-[var(--clay-mint-ink)] sm:text-5xl">
-                Your first line of Python is one squish away.
+                Your first quest is one squish away.
               </h2>
               <p className="mx-auto mt-4 max-w-xl text-base font-bold text-[var(--clay-mint-ink)] opacity-80">
-                Free to play, built for complete beginners, and you can start
-                right now. No installs, no jargon, no judgment.
+                Four paths, {TOTAL_QUESTS} quests, zero installs. Start with Python
+                or jump straight to C, C++ or the ideas behind AI.
               </p>
               <div className="mt-8 flex flex-col items-center justify-center gap-3 sm:flex-row">
                 <Button
@@ -491,7 +487,7 @@ export default function Landing() {
                   className="clay-btn h-14 rounded-2xl bg-[var(--clay-mint-ink)] px-8 text-base font-extrabold text-white hover:bg-[var(--clay-mint-ink)]"
                 >
                   <Link to={startHref}>
-                    Start learning Python
+                    Start learning free
                     <ArrowRight className="size-5" />
                   </Link>
                 </Button>
@@ -508,7 +504,7 @@ export default function Landing() {
         <div className="mx-auto flex w-full max-w-6xl flex-col items-center justify-between gap-4 px-4 py-8 sm:flex-row sm:px-6">
           <Brand />
           <p className="text-center text-xs font-bold text-muted-foreground">
-            Made for absolute beginners · Python first · C, C++ and AI coming next
+            Made for absolute beginners · Python · C · C++ · AI
           </p>
           <div className="flex items-center gap-4 text-xs font-bold text-muted-foreground">
             <a href="#paths" className="hover:text-foreground">Paths</a>

@@ -292,7 +292,7 @@ function Auth({ redirectAfterAuth }: AuthProps = {}) {
 
             <div className="flex items-center justify-center gap-2 border-t border-border/70 bg-[var(--muted)] px-6 py-3.5 text-[11px] font-bold text-muted-foreground">
               <Sparkles className="size-3.5" />
-              14 quests · explanations included · free to play
+              Four paths · explanations included · free to play
             </div>
           </Card>
 

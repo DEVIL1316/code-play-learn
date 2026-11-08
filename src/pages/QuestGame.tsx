@@ -2,9 +2,9 @@ import { GameHeader } from "@/components/GameHeader";
 import { Button } from "@/components/ui/button";
 import { api } from "@/convex/_generated/api";
 import {
-  PYTHON_LESSONS,
-  PYTHON_UNITS,
+  getTrack,
   type Challenge,
+  type LanguageTrack,
   type Lesson,
 } from "@/lib/course";
 import { cn } from "@/lib/utils";
@@ -24,7 +24,7 @@ import {
   X,
 } from "lucide-react";
 import { useMemo, useState } from "react";
-import { Link } from "react-router";
+import { Link, Navigate, useParams } from "react-router";
 
 type Phase = "lesson" | "challenge";
 type Status = "idle" | "correct" | "wrong";
@@ -39,8 +39,8 @@ const UNIT_TONES = [
 
 const OPTION_LETTERS = ["A", "B", "C", "D", "E", "F"];
 
-function unitTone(unit: string) {
-  const index = PYTHON_UNITS.findIndex((entry) => entry.name === unit);
+function unitTone(units: LanguageTrack["units"], unit: string) {
+  const index = units.findIndex((entry) => entry.name === unit);
   return UNIT_TONES[index % UNIT_TONES.length];
 }
 
@@ -51,9 +51,11 @@ function answerText(challenge: Challenge) {
 
 function CodeBlock({
   code,
+  label,
   className,
 }: {
   code: string;
+  label: string;
   className?: string;
 }) {
   return (
@@ -63,7 +65,7 @@ function CodeBlock({
         <span className="size-2.5 rounded-full bg-[oklch(0.88_0.11_95)]" />
         <span className="size-2.5 rounded-full bg-[oklch(0.8_0.1_165)]" />
         <span className="ml-auto font-mono text-[10px] font-bold uppercase tracking-widest text-white/40">
-          main.py
+          {label}
         </span>
       </div>
       <pre className="overflow-x-auto px-4 py-4 font-mono text-[13px] leading-7 text-[oklch(0.94_0.02_95)]">
@@ -73,8 +75,15 @@ function CodeBlock({
   );
 }
 
-export default function PythonQuest() {
-  const progress = useQuery(api.progress.getProgress, { language: "python" });
+export default function QuestGame() {
+  const { trackId } = useParams();
+  const track = getTrack(trackId);
+  if (!track) return <Navigate to="/learn" replace />;
+  return <TrackGame key={track.id} track={track} />;
+}
+
+function TrackGame({ track }: { track: LanguageTrack }) {
+  const progress = useQuery(api.progress.getProgress, { language: track.id });
   const completeLevel = useMutation(api.progress.completeLevel);
   const resetProgress = useMutation(api.progress.resetProgress);
 
@@ -93,15 +102,15 @@ export default function PythonQuest() {
   /* Resume at the first quest that is not finished yet. */
   const resumeIndex = useMemo(() => {
     if (!progress) return 0;
-    const next = PYTHON_LESSONS.findIndex(
+    const next = track.lessons.findIndex(
       (item) => !progress.completedLevels.includes(item.id),
     );
-    return next === -1 ? PYTHON_LESSONS.length : next;
-  }, [progress]);
+    return next === -1 ? track.lessons.length : next;
+  }, [progress, track.lessons]);
 
   const currentIndex = activeIndex ?? resumeIndex;
-  const finished = currentIndex >= PYTHON_LESSONS.length;
-  const lesson: Lesson | null = finished ? null : PYTHON_LESSONS[currentIndex];
+  const finished = currentIndex >= track.lessons.length;
+  const lesson: Lesson | null = finished ? null : track.lessons[currentIndex];
   const challenge = lesson?.challenge ?? null;
 
   /* Shuffled presentation order for "arrange the lines" challenges. */
@@ -130,7 +139,7 @@ export default function PythonQuest() {
 
   function saveLevel(target: Lesson) {
     completeLevel({
-      language: "python",
+      language: track.id,
       levelId: target.id,
       xp: target.xp,
     }).catch((error) => console.error("Could not save progress:", error));
@@ -174,11 +183,11 @@ export default function PythonQuest() {
     const ok =
       completedCount === 0 ||
       window.confirm(
-        "Restart the Python path? You keep your account, but your quests and XP will be cleared.",
+        `Restart the ${track.name} path? You keep your account, but your quests and XP will be cleared.`,
       );
     if (!ok) return;
     try {
-      await resetProgress({ language: "python" });
+      await resetProgress({ language: track.id });
       resetPlay(0);
     } catch (error) {
       console.error("Could not reset progress:", error);
@@ -186,9 +195,9 @@ export default function PythonQuest() {
   }
 
   return (
-    <div className="relative min-h-screen">
+    <div className={cn("relative min-h-screen", track.tone)}>
       <div aria-hidden className="pointer-events-none absolute inset-0 -z-10 overflow-hidden">
-        <div className="absolute -right-32 top-16 size-80 rounded-full bg-[var(--clay-mint)] opacity-45" />
+        <div className="absolute -right-32 top-16 size-80 rounded-full bg-[var(--tone)] opacity-45" />
         <div className="absolute -left-24 top-[36rem] size-72 rounded-full bg-[var(--clay-lilac)] opacity-40" />
       </div>
 
@@ -199,32 +208,32 @@ export default function PythonQuest() {
         <aside className="clay order-2 h-fit p-5 lg:sticky lg:top-24 lg:order-1">
           <div className="flex items-center justify-between">
             <p className="flex items-center gap-2 text-[11px] font-extrabold uppercase tracking-[0.16em] text-muted-foreground">
-              <span className="text-base">🐍</span> Python path
+              <span className="text-base">{track.emoji}</span> {track.name} path
             </p>
-            <span className="rounded-full bg-[var(--clay-mint)] px-2.5 py-0.5 text-[11px] font-extrabold text-[var(--clay-mint-ink)]">
-              {completedCount}/{PYTHON_LESSONS.length}
+            <span className="rounded-full bg-[var(--tone)] px-2.5 py-0.5 text-[11px] font-extrabold text-[var(--tone-ink)]">
+              {completedCount}/{track.lessons.length}
             </span>
           </div>
           <div className="clay-inset mt-3 h-3 overflow-hidden rounded-full p-0.5">
             <div
-              className="h-full rounded-full bg-[var(--clay-mint)] shadow-[inset_0_-2px_0_rgba(60,50,90,0.15)] transition-all duration-500"
+              className="h-full rounded-full bg-[var(--tone)] shadow-[inset_0_-2px_0_rgba(60,50,90,0.15)] transition-all duration-500"
               style={{
                 width: `${Math.round(
-                  (completedCount / PYTHON_LESSONS.length) * 100,
+                  (completedCount / track.lessons.length) * 100,
                 )}%`,
               }}
             />
           </div>
 
           <div className="no-scrollbar mt-5 max-h-[58vh] space-y-5 overflow-y-auto pr-1">
-            {PYTHON_UNITS.map((unit) => (
+            {track.units.map((unit) => (
               <div key={unit.name}>
                 <p className="mb-2 px-1 text-[10px] font-extrabold uppercase tracking-[0.14em] text-muted-foreground/80">
                   {unit.name}
                 </p>
                 <div className="space-y-1">
                   {unit.lessons.map((item) => {
-                    const index = PYTHON_LESSONS.findIndex(
+                    const index = track.lessons.findIndex(
                       (entry) => entry.id === item.id,
                     );
                     const done = completedIds.includes(item.id);
@@ -237,7 +246,7 @@ export default function PythonQuest() {
                         className={cn(
                           "flex w-full items-center gap-2.5 rounded-xl px-2.5 py-2 text-left transition",
                           active
-                            ? "bg-[var(--clay-mint)] text-[var(--clay-mint-ink)] shadow-[inset_0_-2px_0_rgba(60,50,90,0.1)]"
+                            ? "bg-[var(--tone)] text-[var(--tone-ink)] shadow-[inset_0_-2px_0_rgba(60,50,90,0.1)]"
                             : "text-muted-foreground hover:bg-muted",
                         )}
                       >
@@ -245,9 +254,9 @@ export default function PythonQuest() {
                           className={cn(
                             "grid size-6 shrink-0 place-items-center rounded-full text-[10px] font-extrabold",
                             done
-                              ? "bg-[var(--clay-mint-ink)] text-white"
+                              ? "bg-[var(--tone-ink)] text-white"
                               : active
-                                ? "bg-white text-[var(--clay-mint-ink)]"
+                                ? "bg-white text-[var(--tone-ink)]"
                                 : "bg-muted-foreground/10 text-muted-foreground",
                           )}
                         >
@@ -306,12 +315,12 @@ export default function PythonQuest() {
                   🏆
                 </div>
                 <h1 className="mt-6 text-4xl font-semibold sm:text-5xl">
-                  Python path complete!
+                  {track.name} path complete!
                 </h1>
                 <p className="mx-auto mt-3 max-w-md text-muted-foreground">
-                  You finished all {PYTHON_LESSONS.length} beginner quests with{" "}
-                  {xp} XP. Variables, choices, loops, functions and lists are now
-                  part of your toolkit.
+                  You cleared all {track.lessons.length} quests with {xp} XP.{" "}
+                  {track.concepts.slice(0, 4).join(", ")} are now part of your
+                  toolkit.
                 </p>
                 <div className="mt-8 flex flex-col items-center justify-center gap-3 sm:flex-row">
                   <Button asChild className="clay-btn h-12 rounded-2xl px-6 font-extrabold">
@@ -344,7 +353,7 @@ export default function PythonQuest() {
                     <span
                       className={cn(
                         "clay-tile grid size-16 place-items-center text-3xl",
-                        unitTone(lesson.unit),
+                        unitTone(track.units, lesson.unit),
                       )}
                     >
                       {lesson.icon}
@@ -352,7 +361,7 @@ export default function PythonQuest() {
                     <div>
                       <p className="text-[11px] font-extrabold uppercase tracking-[0.16em] text-muted-foreground">
                         {lesson.unit} · Quest {currentIndex + 1} of{" "}
-                        {PYTHON_LESSONS.length}
+                        {track.lessons.length}
                       </p>
                       <h1 className="mt-1 font-display text-2xl font-semibold sm:text-3xl">
                         {lesson.title}
@@ -375,7 +384,7 @@ export default function PythonQuest() {
                       className={cn(
                         "flex items-center gap-1.5 rounded-full px-3.5 py-1.5 text-[11px] font-extrabold uppercase tracking-wider",
                         step.key === "lesson"
-                          ? "bg-[var(--clay-mint)] text-[var(--clay-mint-ink)]"
+                          ? "bg-[var(--tone)] text-[var(--tone-ink)]"
                           : "bg-muted text-muted-foreground",
                       )}
                     >
@@ -384,7 +393,7 @@ export default function PythonQuest() {
                     </span>
                   ))}
                   {completedIds.includes(lesson.id) && (
-                    <span className="ml-auto flex items-center gap-1 text-[11px] font-extrabold uppercase tracking-wider text-[var(--clay-mint-ink)]">
+                    <span className="ml-auto flex items-center gap-1 text-[11px] font-extrabold uppercase tracking-wider text-[var(--tone-ink)]">
                       <Check className="size-3.5" strokeWidth={3} />
                       Already complete
                     </span>
@@ -408,7 +417,7 @@ export default function PythonQuest() {
                     Worked example
                   </p>
                   <div className="mt-2">
-                    <CodeBlock code={lesson.example.code} />
+                    <CodeBlock code={lesson.example.code} label={track.codeLabel} />
                   </div>
                   <div className="clay-inset mt-3 flex flex-wrap items-center gap-3 rounded-xl px-4 py-3">
                     <span className="font-mono text-[10px] font-bold uppercase tracking-widest text-muted-foreground">
@@ -448,7 +457,7 @@ export default function PythonQuest() {
                     <span
                       className={cn(
                         "clay-tile grid size-16 place-items-center text-3xl",
-                        unitTone(lesson.unit),
+                        unitTone(track.units, lesson.unit),
                       )}
                     >
                       {lesson.icon}
@@ -531,7 +540,7 @@ export default function PythonQuest() {
                           </pre>
                         </div>
                       ) : (
-                        <CodeBlock code={challenge.code} />
+                        <CodeBlock code={challenge.code} label={track.codeLabel} />
                       )}
                     </div>
                   )}
@@ -542,7 +551,7 @@ export default function PythonQuest() {
                     <div className="clay-inset min-h-24 rounded-2xl p-3">
                       {ordered.length === 0 ? (
                         <p className="px-2 py-4 text-center text-xs font-bold text-muted-foreground">
-                          Tap the lines below in the order Python should run them.
+                          Tap the lines below in the order they should run.
                         </p>
                       ) : (
                         <div className="space-y-2">
@@ -739,7 +748,7 @@ export default function PythonQuest() {
                           onClick={goNext}
                           className="clay-btn mt-4 h-11 rounded-xl bg-[var(--clay-mint-ink)] px-5 font-extrabold text-white hover:bg-[var(--clay-mint-ink)]"
                         >
-                          {currentIndex + 1 >= PYTHON_LESSONS.length
+                          {currentIndex + 1 >= track.lessons.length
                             ? "Finish the path"
                             : "Next quest"}
                           <ArrowRight className="size-4" />

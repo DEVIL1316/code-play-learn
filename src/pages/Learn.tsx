@@ -2,11 +2,7 @@ import { GameHeader } from "@/components/GameHeader";
 import { Button } from "@/components/ui/button";
 import { useAuth } from "@/hooks/use-auth";
 import { api } from "@/convex/_generated/api";
-import {
-  LANGUAGE_TRACKS,
-  PYTHON_LESSONS,
-  PYTHON_TOTAL_XP,
-} from "@/lib/course";
+import { LANGUAGE_TRACKS, TOTAL_QUESTS, TOTAL_XP } from "@/lib/course";
 import { cn } from "@/lib/utils";
 import { useQuery } from "convex/react";
 import { motion } from "framer-motion";
@@ -14,7 +10,6 @@ import {
   ArrowRight,
   Check,
   Compass,
-  Lock,
   Sparkles,
   Sprout,
   Trophy,
@@ -23,14 +18,27 @@ import { Link } from "react-router";
 
 export default function Learn() {
   const { user } = useAuth();
-  const progress = useQuery(api.progress.getProgress, { language: "python" });
+  const progressRows = useQuery(api.progress.getAllProgress, {});
+  const rows = progressRows ?? [];
 
-  const completed = progress?.completedLevels.length ?? 0;
-  const xp = progress?.xp ?? 0;
-  const percent = Math.round((completed / PYTHON_LESSONS.length) * 100);
+  const rowFor = (trackId: string) =>
+    rows.find((row) => row.language === trackId);
+  const totalXp = rows.reduce((sum, row) => sum + row.xp, 0);
+  const doneCount = rows.reduce(
+    (sum, row) => sum + row.completedLevels.length,
+    0,
+  );
+  const percent = Math.min(100, Math.round((doneCount / TOTAL_QUESTS) * 100));
+
+  const nextTrack =
+    LANGUAGE_TRACKS.find((track) => {
+      const row = rowFor(track.id);
+      return (row?.completedLevels.length ?? 0) < track.lessons.length;
+    }) ?? null;
+  const nextRow = nextTrack ? rowFor(nextTrack.id) : undefined;
   const nextLesson =
-    PYTHON_LESSONS.find(
-      (lesson) => !progress?.completedLevels.includes(lesson.id),
+    nextTrack?.lessons.find(
+      (lesson) => !nextRow?.completedLevels.includes(lesson.id),
     ) ?? null;
 
   return (
@@ -38,9 +46,10 @@ export default function Learn() {
       <div aria-hidden className="pointer-events-none absolute inset-0 -z-10 overflow-hidden">
         <div className="absolute -right-32 top-24 size-80 rounded-full bg-[var(--clay-mint)] opacity-50" />
         <div className="absolute -left-28 top-[30rem] size-72 rounded-full bg-[var(--clay-butter)] opacity-60" />
+        <div className="absolute right-10 top-[62rem] size-56 rounded-full bg-[var(--clay-lilac)] opacity-40" />
       </div>
 
-      <GameHeader xp={xp} />
+      <GameHeader xp={totalXp} />
 
       <main className="mx-auto w-full max-w-6xl px-4 pb-16 sm:px-6">
         <motion.div
@@ -57,8 +66,9 @@ export default function Learn() {
             {user?.name ? `Hey ${user.name.split(" ")[0]} — pick a path.` : "Pick a path."}
           </h1>
           <p className="mt-3 text-lg text-muted-foreground">
-            Python is open for play right now. One path at a time, one tiny
-            concept at a time.
+            Four paths are open: Python from first line to classes, C and C++
+            down to pointers, and the ideas behind AI. One tiny concept at a
+            time.
           </p>
         </motion.div>
 
@@ -71,16 +81,16 @@ export default function Learn() {
         >
           <div className="flex items-center gap-4">
             <span className="clay-tile tone-mint grid size-14 shrink-0 place-items-center text-2xl">
-              🐍
+              🧶
             </span>
             <div>
               <p className="text-[11px] font-extrabold uppercase tracking-widest text-muted-foreground">
-                Python path
+                Your learning
               </p>
               <p className="font-display text-xl font-semibold">
-                {completed === 0
+                {doneCount === 0
                   ? "Ready for your first quest"
-                  : `${completed} of ${PYTHON_LESSONS.length} quests complete`}
+                  : `${doneCount} of ${TOTAL_QUESTS} quests complete`}
               </p>
               <div className="clay-inset mt-2 h-3 w-full min-w-48 overflow-hidden rounded-full p-0.5">
                 <div
@@ -93,24 +103,21 @@ export default function Learn() {
           <div className="flex flex-wrap items-center gap-2.5">
             <span className="flex items-center gap-2 rounded-full bg-[var(--clay-butter)] px-4 py-2 text-sm font-extrabold text-[var(--clay-butter-ink)]">
               <Sparkles className="size-4" />
-              {xp} / {PYTHON_TOTAL_XP} XP
+              {totalXp} / {TOTAL_XP} XP
             </span>
-            <Button
-              asChild
-              className="clay-btn rounded-xl font-extrabold"
-            >
-              <Link to="/learn/python">
-                {completed === 0 ? "Start learning" : "Continue"}
-                <ArrowRight className="size-4" />
-              </Link>
-            </Button>
           </div>
         </motion.div>
 
         {/* Language options */}
         <div className="mt-8 grid gap-5 sm:grid-cols-2 lg:grid-cols-4">
           {LANGUAGE_TRACKS.map((track, index) => {
-            const open = track.status === "open";
+            const row = rowFor(track.id);
+            const done = row?.completedLevels.length ?? 0;
+            const trackPercent = Math.min(
+              100,
+              Math.round((done / track.lessons.length) * 100),
+            );
+            const complete = done >= track.lessons.length;
             return (
               <motion.article
                 key={track.id}
@@ -118,9 +125,8 @@ export default function Learn() {
                 animate={{ opacity: 1, y: 0 }}
                 transition={{ duration: 0.45, delay: 0.12 + index * 0.06 }}
                 className={cn(
-                  "clay-tile flex flex-col gap-4 p-6",
+                  "clay-tile clay-lift flex flex-col gap-4 p-6",
                   track.tone,
-                  open ? "clay-lift" : "",
                 )}
               >
                 <div className="flex items-start justify-between">
@@ -128,7 +134,7 @@ export default function Learn() {
                     {track.emoji}
                   </span>
                   <span className="flex items-center gap-1 rounded-full bg-white/55 px-2.5 py-1 text-[10px] font-extrabold uppercase tracking-wider text-[var(--tone-ink)]">
-                    {open ? <Sprout className="size-3" /> : <Lock className="size-3" />}
+                    <Sprout className="size-3" />
                     {track.tagline}
                   </span>
                 </div>
@@ -153,30 +159,34 @@ export default function Learn() {
                   ))}
                 </div>
 
-                {open ? (
-                  <>
-                    <div className="mt-auto flex items-center gap-2 text-xs font-extrabold uppercase tracking-wider text-[var(--tone-ink)] opacity-70">
-                      <Check className="size-3.5" />
-                      {completed > 0
-                        ? `${completed}/${track.quests} done`
-                        : `${track.quests} quests waiting`}
-                    </div>
-                    <Button
-                      asChild
-                      className="clay-btn w-full rounded-xl bg-[var(--tone-ink)] font-extrabold text-white hover:bg-[var(--tone-ink)]"
-                    >
-                      <Link to="/learn/python">
-                        {completed > 0 ? "Keep going" : "Play Python"}
-                        <ArrowRight className="size-4" />
-                      </Link>
-                    </Button>
-                  </>
-                ) : (
-                  <div className="mt-auto flex h-9 items-center justify-center gap-2 rounded-xl bg-white/45 text-xs font-extrabold uppercase tracking-wider text-[var(--tone-ink)] opacity-80">
-                    <Lock className="size-3.5" />
-                    Coming soon
+                <div className="mt-auto space-y-2">
+                  <div className="flex items-center justify-between text-[11px] font-extrabold uppercase tracking-wider text-[var(--tone-ink)] opacity-75">
+                    <span>
+                      {done}/{track.lessons.length} quests
+                    </span>
+                    <span>{track.totalXp} XP</span>
                   </div>
-                )}
+                  <div className="clay-inset h-2.5 overflow-hidden rounded-full p-0.5">
+                    <div
+                      className="h-full rounded-full bg-[var(--tone)] transition-all duration-500"
+                      style={{ width: `${trackPercent}%` }}
+                    />
+                  </div>
+                </div>
+
+                <Button
+                  asChild
+                  className="clay-btn w-full rounded-xl bg-[var(--tone-ink)] font-extrabold text-white hover:bg-[var(--tone-ink)]"
+                >
+                  <Link to={`/learn/${track.id}`}>
+                    {complete
+                      ? "Replay path"
+                      : done > 0
+                        ? "Keep going"
+                        : `Play ${track.name}`}
+                    <ArrowRight className="size-4" />
+                  </Link>
+                </Button>
               </motion.article>
             );
           })}
@@ -190,17 +200,18 @@ export default function Learn() {
           className="clay-soft mt-8 flex flex-col items-start justify-between gap-4 p-6 sm:flex-row sm:items-center"
         >
           <div className="flex items-start gap-4">
-            <span className="clay-tile tone-butter grid size-12 shrink-0 place-items-center">
-              <Trophy className="size-5 text-[var(--clay-butter-ink)]" />
+            <span className="clay-tile tone-butter grid size-12 shrink-0 place-items-center text-xl">
+              {nextTrack?.emoji ?? "🏆"}
             </span>
             <div>
-              <p className="text-[11px] font-extrabold uppercase tracking-widest text-muted-foreground">
-                {nextLesson ? "Next up" : "Path complete"}
+              <p className="flex items-center gap-2 text-[11px] font-extrabold uppercase tracking-widest text-muted-foreground">
+                <Trophy className="size-3.5" />
+                {nextTrack ? `Next up · ${nextTrack.name}` : "All paths complete"}
               </p>
               <p className="font-display text-lg font-semibold">
-                {nextLesson
+                {nextTrack && nextLesson
                   ? `${nextLesson.icon} ${nextLesson.title} · ${nextLesson.summary}`
-                  : "You finished every Python quest. Legendary squish."}
+                  : "You finished every quest. Legendary squish."}
               </p>
             </div>
           </div>
@@ -209,12 +220,24 @@ export default function Learn() {
             variant="outline"
             className="clay-btn shrink-0 rounded-xl border-0 bg-white font-extrabold"
           >
-            <Link to="/learn/python">
-              {nextLesson ? "Jump in" : "Replay"}
+            <Link to={nextTrack ? `/learn/${nextTrack.id}` : "/learn/python"}>
+              {nextLesson ? "Jump in" : "Replay Python"}
               <ArrowRight className="size-4" />
             </Link>
           </Button>
         </motion.div>
+
+        <div className="mt-6 flex flex-wrap items-center justify-center gap-x-6 gap-y-2 text-[11px] font-extrabold uppercase tracking-wider text-muted-foreground">
+          <span className="flex items-center gap-1.5">
+            <Check className="size-3.5" /> Explanations after every answer
+          </span>
+          <span className="flex items-center gap-1.5">
+            <Check className="size-3.5" /> Progress saved per path
+          </span>
+          <span className="flex items-center gap-1.5">
+            <Check className="size-3.5" /> Wrong answers are safe
+          </span>
+        </div>
       </main>
     </div>
   );

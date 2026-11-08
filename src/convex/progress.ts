@@ -18,6 +18,20 @@ export const getProgress = query({
   },
 });
 
+/** Read every track's progress for the signed-in player. */
+export const getAllProgress = query({
+  args: {},
+  handler: async (ctx) => {
+    const userId = await getAuthUserId(ctx);
+    if (userId === null) return [];
+
+    return await ctx.db
+      .query("progress")
+      .withIndex("by_user_language", (q) => q.eq("userId", userId))
+      .collect();
+  },
+});
+
 /** Mark a quest complete. Replaying a finished quest never grants XP twice. */
 export const completeLevel = mutation({
   args: {
