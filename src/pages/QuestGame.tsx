@@ -7,9 +7,10 @@ import {
   type LanguageTrack,
   type Lesson,
 } from "@/lib/course";
-import { outputsMatch, preloadPython, runPython } from "@/lib/python";
+import { getLanguage, languageForTrack, runCode } from "@/lib/languages";
+import { outputsMatch, preloadPython } from "@/lib/python";
 import { cn } from "@/lib/utils";
-import { useMutation, useQuery } from "convex/react";
+import { useAction, useMutation, useQuery } from "convex/react";
 import { AnimatePresence, motion } from "framer-motion";
 import {
   ArrowLeft,
@@ -89,6 +90,7 @@ function TrackGame({ track }: { track: LanguageTrack }) {
   const progress = useQuery(api.progress.getProgress, { language: track.id });
   const completeLevel = useMutation(api.progress.completeLevel);
   const resetProgress = useMutation(api.progress.resetProgress);
+  const runRemoteCode = useAction(api.code.runRemoteCode);
 
   /* null means "follow the first unfinished quest" until the player picks one. */
   const [activeIndex, setActiveIndex] = useState<number | null>(null);
@@ -122,6 +124,11 @@ function TrackGame({ track }: { track: LanguageTrack }) {
   const finished = currentIndex >= track.lessons.length;
   const lesson: Lesson | null = finished ? null : track.lessons[currentIndex];
   const challenge = lesson?.challenge ?? null;
+  const codeLanguage = getLanguage(
+    challenge?.kind === "code"
+      ? (challenge.language ?? languageForTrack(track.id))
+      : languageForTrack(track.id),
+  );
   const codeStarter = challenge?.kind === "code" ? challenge.starter : "";
   const editorValue = code ?? codeStarter;
 
@@ -154,8 +161,10 @@ function TrackGame({ track }: { track: LanguageTrack }) {
   }
 
   useEffect(() => {
-    if (challenge?.kind === "code") preloadPython();
-  }, [challenge?.kind]);
+    if (challenge?.kind === "code" && codeLanguage.id === "python") {
+      preloadPython();
+    }
+  }, [challenge?.kind, codeLanguage.id]);
 
   function saveLevel(target: Lesson) {
     completeLevel({
@@ -192,11 +201,13 @@ function TrackGame({ track }: { track: LanguageTrack }) {
 
     let result;
     try {
-      result = await runPython(editorValue);
+      result = await runCode(codeLanguage.id, editorValue, (args) =>
+        runRemoteCode(args),
+      );
     } catch {
       result = {
         output: "",
-        error: "Python could not run that program. Try again.",
+        error: `${codeLanguage.name} could not run that program. Try again.`,
       };
     }
     if (token !== runToken.current) return;
@@ -211,7 +222,8 @@ function TrackGame({ track }: { track: LanguageTrack }) {
 
   function goNext() {
     if (!lesson) return;
-    if (status === "wrong") saveLevel(lesson);
+    /* Code quests only pay out when the program actually passes. */
+    if (status === "wrong" && challenge?.kind !== "code") saveLevel(lesson);
     resetPlay(currentIndex + 1);
   }
 
@@ -598,7 +610,7 @@ function TrackGame({ track }: { track: LanguageTrack }) {
                       <div className="flex items-center justify-between gap-3 border-b border-white/10 px-4 py-2.5">
                         <span className="flex items-center gap-2 font-mono text-[10px] font-bold uppercase tracking-widest text-white/45">
                           <Code2 className="size-3.5" />
-                          python · runs in your browser
+                          {codeLanguage.name} · {codeLanguage.runtime}
                         </span>
                         <button
                           type="button"
@@ -638,7 +650,7 @@ function TrackGame({ track }: { track: LanguageTrack }) {
                         readOnly={status === "correct"}
                         spellCheck={false}
                         rows={10}
-                        aria-label="Python code editor"
+                        aria-label={`${codeLanguage.name} code editor`}
                         className="w-full resize-y bg-transparent px-4 py-3 font-mono text-[13px] leading-6 text-[oklch(0.94_0.02_95)] outline-none"
                       />
                     </div>
@@ -665,15 +677,23 @@ function TrackGame({ track }: { track: LanguageTrack }) {
                           <Play className="size-4" />
                         )}
                         {running
-                          ? "Running…"
+                          ? codeLanguage.id === "python"
+                            ? "Running…"
+                            : "Compiling…"
                           : runResult
                             ? "Run again"
-                            : "Run program"}
+                            : codeLanguage.id === "python"
+                              ? "Run program"
+                              : "Compile & run"}
                       </Button>
                       <span className="text-xs font-bold text-muted-foreground">
                         {running
-                          ? "The first run loads Python — this can take a moment."
-                          : "Edit freely. Run as many times as you need."}
+                          ? codeLanguage.id === "python"
+                            ? "The first run loads Python — this can take a moment."
+                            : "Compiling in the remote sandbox — usually a few seconds."
+                          : codeLanguage.id === "python"
+                            ? "Edit freely. Run as many times as you need."
+                            : "Your source is sent to a sandbox to compile. Nothing is saved there."}
                       </span>
                     </div>
 
@@ -951,7 +971,7 @@ function TrackGame({ track }: { track: LanguageTrack }) {
                             variant="outline"
                             className="h-11 rounded-xl border-0 bg-white/80 px-5 font-extrabold"
                           >
-                            Continue
+                            {challenge.kind === "code" ? "Skip for now" : "Continue"}
                             <ArrowRight className="size-4" />
                           </Button>
                         </div>

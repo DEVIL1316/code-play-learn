@@ -184,4 +184,171 @@ export const CPP_LESSONS: Lesson[] = [
     xp: 40,
     minutes: 6,
   },
+  {
+    id: "cpp-code-fizzbuzz",
+    unit: "Build it for real",
+    title: "FizzBuzz, compiled",
+    icon: "🎮",
+    summary: "Write a complete C++ program from scratch",
+    explanation: [
+      "A whole C++ program has an include, a main function, a loop and a set of branches. std::cout sends each piece of text to the output stream, and the newline escape starts a new line.",
+      "Test n % 15 first. Otherwise a number such as 15 would match n % 3 and print Fizz before the program ever checks for FizzBuzz.",
+    ],
+    example: {
+      code: `#include <iostream>
+
+int main() {
+    for (int n = 1; n <= 15; n++) {
+        if (n % 15 == 0) {
+            std::cout << "FizzBuzz\\n";
+        } else if (n % 3 == 0) {
+            std::cout << "Fizz\\n";
+        } else if (n % 5 == 0) {
+            std::cout << "Buzz\\n";
+        } else {
+            std::cout << n << "\\n";
+        }
+    }
+    return 0;
+}`,
+      output:
+        "1\n2\nFizz\n4\nBuzz\nFizz\n7\n8\nFizz\nBuzz\n11\nFizz\n13\n14\nFizzBuzz",
+    },
+    challenge: {
+      kind: "code",
+      language: "cpp",
+      prompt:
+        "Write a full C++ program that prints 1 to 15, one per line. Print Fizz for multiples of 3, Buzz for multiples of 5, and FizzBuzz for multiples of both.",
+      starter: `#include <iostream>
+
+int main() {
+    for (int n = 1; n <= 15; n++) {
+        // Print FizzBuzz, Fizz, Buzz, or the number.
+    }
+    return 0;
+}`,
+      expectedOutput:
+        "1\n2\nFizz\n4\nBuzz\nFizz\n7\n8\nFizz\nBuzz\n11\nFizz\n13\n14\nFizzBuzz",
+      explanation:
+        "Loop from 1 through 15 and check n % 15 before the single checks. std::cout << value sends the value to the screen, and \\n moves to the next line. The final else handles every ordinary number.",
+    },
+    xp: 60,
+    minutes: 8,
+  },
+  {
+    id: "cpp-code-scores",
+    unit: "Build it for real",
+    title: "Vector report",
+    icon: "📊",
+    summary: "Loop, total, divide and format a report",
+    explanation: [
+      "A std::vector knows its own size, so this report can add every score and divide by scores.size(). A range-for loop visits each int without an index.",
+      "static_cast<double>(total) makes the division use decimals instead of integer division. std::fixed with std::setprecision(1) then prints exactly one digit after the point.",
+    ],
+    example: {
+      code: `#include <iomanip>
+#include <iostream>
+#include <vector>
+
+int main() {
+    std::vector<int> scores = {10, 20, 30};
+    int total = 0;
+
+    for (int score : scores) {
+        total += score;
+    }
+
+    double average = static_cast<double>(total) / scores.size();
+    std::cout << "Total: " << total << "\\n";
+    std::cout << std::fixed << std::setprecision(1);
+    std::cout << "Average: " << average << "\\n";
+    return 0;
+}`,
+      output: "Total: 60\nAverage: 20.0",
+    },
+    challenge: {
+      kind: "code",
+      language: "cpp",
+      prompt:
+        "Finish the program so it prints exactly “Total: 60”, then “Average: 20.0”.",
+      starter: `#include <iomanip>
+#include <iostream>
+#include <vector>
+
+int main() {
+    std::vector<int> scores = {10, 20, 30};
+    int total = 0;
+
+    // Add every score to total.
+
+    // Print the total, then the average with one decimal.
+    return 0;
+}`,
+      expectedOutput: "Total: 60\nAverage: 20.0",
+      explanation:
+        "The range-for adds each score to total. Dividing by scores.size() gives the average; the static_cast keeps the decimal part. std::fixed and setprecision(1) make the second line print 20.0 rather than 20.",
+    },
+    xp: 55,
+    minutes: 7,
+  },
+  {
+    id: "cpp-code-counter",
+    unit: "Build it for real",
+    title: "A counter object",
+    icon: "🧩",
+    summary: "Use a class from a complete program",
+    explanation: [
+      "The class definition is only a blueprint. main creates a Counter object, and that object receives its own value member starting at 0.",
+      "Each c.add(...) call runs the method on c and changes c.value. Calling add(2) then add(3) accumulates 5, which the final std::cout prints.",
+    ],
+    example: {
+      code: `#include <iostream>
+
+class Counter {
+public:
+    int value = 0;
+
+    void add(int n) {
+        value += n;
+    }
+};
+
+int main() {
+    Counter c;
+    c.add(2);
+    c.add(3);
+    std::cout << "Count: " << c.value << "\\n";
+    return 0;
+}`,
+      output: "Count: 5",
+    },
+    challenge: {
+      kind: "code",
+      language: "cpp",
+      prompt:
+        "Finish main so the program prints exactly “Count: 5”.",
+      starter: `#include <iostream>
+
+class Counter {
+public:
+    int value = 0;
+
+    void add(int n) {
+        value += n;
+    }
+};
+
+int main() {
+    Counter c;
+    // Add 2, then add 3.
+    // Print "Count: " followed by c.value and a newline.
+    return 0;
+}`,
+      expectedOutput: "Count: 5",
+      explanation:
+        "c starts with value 0. c.add(2) makes it 2 and c.add(3) makes it 5. Methods work on the object they are called on, so printing c.value shows the accumulated total.",
+    },
+    xp: 55,
+    minutes: 7,
+  },
 ];

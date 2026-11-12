@@ -330,20 +330,22 @@ export default function Landing() {
             <div>
               <span className="inline-flex items-center gap-2 rounded-full bg-white/55 px-3.5 py-1.5 text-[11px] font-extrabold uppercase tracking-widest text-[var(--clay-sky-ink)]">
                 <Code2 className="size-3.5" />
-                Code Lab · real Python
+                Code Lab · 6 languages
               </span>
               <h2 className="mt-4 text-4xl font-semibold text-[var(--clay-sky-ink)] sm:text-5xl">
                 Not just quizzes. Write the whole program.
               </h2>
               <p className="mt-4 text-base font-semibold leading-relaxed text-[var(--clay-sky-ink)] opacity-80">
-                Open a real editor, write any Python you like, and run it right
-                in the browser. The console shows the output — and the errors,
-                which are where the learning happens.
+                Open a real editor and write a whole program in Python, C, C++,
+                JavaScript, Java or Go. Python runs in the browser; the others
+                compile in a sandbox. The console shows the output — and the
+                errors, which are where the learning happens.
               </p>
               <ul className="mt-6 space-y-3">
                 {[
                   "A full code editor with tab support",
-                  "Real Python 3 output and tracebacks",
+                  "Real output, tracebacks and compiler errors",
+                  "Python locally, five more languages in a sandbox",
                   "Starter programs for loops, classes and reports",
                 ].map((item) => (
                   <li key={item} className="flex items-start gap-3">

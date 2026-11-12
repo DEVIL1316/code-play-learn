@@ -10,6 +10,7 @@ import type { Lesson, Unit } from "@/lib/track-types";
 export type {
   ArcadeChallenge,
   Challenge,
+  CodeLanguageId,
   Lesson,
   Unit,
 } from "@/lib/track-types";
@@ -58,7 +59,7 @@ const TRACK_META = [
     emoji: "🧱",
     tagline: "See the machine",
     blurb:
-      "See how memory and the machine really work, one tiny building block at a time.",
+      "See how memory and the machine really work, one tiny building block at a time — then write complete C programs.",
     tone: "tone-sky",
     codeLabel: "main.c",
     concepts: ["types", "printf", "loops", "arrays", "pointers"],
@@ -69,7 +70,7 @@ const TRACK_META = [
     emoji: "⚙️",
     tagline: "Go powerful",
     blurb:
-      "Powerful, fast, and structured. Learn streams, containers and your first class.",
+      "Powerful, fast, and structured. Learn streams, containers and your first class, then build a full program.",
     tone: "tone-peach",
     codeLabel: "main.cpp",
     concepts: ["std::cout", "vectors", "range-for", "classes"],

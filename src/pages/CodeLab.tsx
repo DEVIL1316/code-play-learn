@@ -1,9 +1,16 @@
 import { GameHeader } from "@/components/GameHeader";
 import { Button } from "@/components/ui/button";
 import { api } from "@/convex/_generated/api";
-import { preloadPython, runPython } from "@/lib/python";
+import {
+  CODE_LANGUAGES,
+  getLanguage,
+  runCode,
+  type Starter,
+} from "@/lib/languages";
+import { preloadPython } from "@/lib/python";
+import type { CodeLanguageId } from "@/lib/track-types";
 import { cn } from "@/lib/utils";
-import { useQuery } from "convex/react";
+import { useAction, useQuery } from "convex/react";
 import { motion } from "framer-motion";
 import {
   ArrowLeft,
@@ -15,35 +22,8 @@ import {
   Terminal,
   Trash2,
 } from "lucide-react";
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { Link } from "react-router";
-
-const STARTERS = [
-  {
-    id: "hello",
-    name: "Hello, player",
-    blurb: "Variables, f-strings and a loop",
-    code: 'name = "player"\nprint(f"Hello, {name}!")\n\nfor n in range(1, 4):\n    print("squish", n)',
-  },
-  {
-    id: "fizzbuzz",
-    name: "FizzBuzz",
-    blurb: "The classic loop challenge",
-    code: 'for n in range(1, 16):\n    if n % 15 == 0:\n        print("FizzBuzz")\n    elif n % 3 == 0:\n        print("Fizz")\n    elif n % 5 == 0:\n        print("Buzz")\n    else:\n        print(n)',
-  },
-  {
-    id: "scores",
-    name: "Score report",
-    blurb: "Lists, totals and formatting",
-    code: 'scores = [10, 20, 30]\ntotal = 0\n\nfor score in scores:\n    total += score\n\naverage = total / len(scores)\nprint(f"Total: {total}")\nprint(f"Average: {average:.1f}")',
-  },
-  {
-    id: "pet",
-    name: "Clay pet",
-    blurb: "A class with methods",
-    code: 'class Pet:\n    def __init__(self, name, energy=3):\n        self.name = name\n        self.energy = energy\n\n    def play(self):\n        self.energy -= 1\n        return f"{self.name} has {self.energy} energy left"\n\npet = Pet("Mochi")\nprint(pet.play())\nprint(pet.play())',
-  },
-] as const;
 
 type RunState = {
   output: string;
@@ -52,39 +32,71 @@ type RunState = {
 
 export default function CodeLab() {
   const progressRows = useQuery(api.progress.getAllProgress, {});
+  const runRemoteCode = useAction(api.code.runRemoteCode);
   const totalXp = (progressRows ?? []).reduce((sum, row) => sum + row.xp, 0);
 
-  const [code, setCode] = useState<string>(STARTERS[0].code);
-  const [activeStarter, setActiveStarter] = useState<string>(STARTERS[0].id);
+  const [languageId, setLanguageId] = useState<CodeLanguageId>("python");
+  const language = getLanguage(languageId);
+  const [code, setCode] = useState<string>(CODE_LANGUAGES[0].starters[0].code);
+  const [activeStarter, setActiveStarter] = useState<string>(
+    CODE_LANGUAGES[0].starters[0].id,
+  );
   const [result, setResult] = useState<RunState>(null);
   const [running, setRunning] = useState(false);
+  const runToken = useRef(0);
 
-  /* Warm up the Python runtime while the player reads the page. */
+  /* Warm up the local Python runtime while the player reads the page. */
   useEffect(() => {
     preloadPython();
   }, []);
 
-  function loadStarter(starter: (typeof STARTERS)[number]) {
+  function loadLanguage(nextId: CodeLanguageId) {
+    if (nextId === languageId) return;
+    const next = getLanguage(nextId);
+    runToken.current += 1;
+    setLanguageId(next.id);
+    setActiveStarter(next.starters[0].id);
+    setCode(next.starters[0].code);
+    setResult(null);
+    setRunning(false);
+  }
+
+  function loadStarter(starter: Starter) {
+    runToken.current += 1;
     setActiveStarter(starter.id);
     setCode(starter.code);
     setResult(null);
+    setRunning(false);
   }
 
   async function handleRun() {
     if (running) return;
+    const token = ++runToken.current;
     setRunning(true);
     try {
-      const next = await runPython(code);
+      const next = await runCode(language.id, code, (args) =>
+        runRemoteCode(args),
+      );
+      if (token !== runToken.current) return;
       setResult(next);
     } catch {
+      if (token !== runToken.current) return;
       setResult({
         output: "",
-        error: "Python could not run that program. Try again.",
+        error: `${language.name} could not run that program. Try again.`,
       });
     } finally {
-      setRunning(false);
+      if (token === runToken.current) setRunning(false);
     }
   }
+
+  const runHint = running
+    ? language.id === "python"
+      ? "The first run loads Python — this can take a moment."
+      : `Compiling ${language.name} in the remote sandbox — usually a few seconds.`
+    : language.id === "python"
+      ? "Output appears below. Errors are safe to read and fix."
+      : "Your code is sent to a sandbox to compile. Nothing is saved there.";
 
   return (
     <div className="relative min-h-screen">
@@ -104,23 +116,47 @@ export default function CodeLab() {
         >
           <span className="clay-soft inline-flex items-center gap-2 rounded-full px-3.5 py-1.5 text-[11px] font-extrabold uppercase tracking-[0.16em] text-[var(--clay-lilac-ink)]">
             <Sparkles className="size-3.5" />
-            Full programs, not multiple choice
+            Six languages, real output
           </span>
           <h1 className="mt-5 text-4xl font-semibold sm:text-5xl">Code Lab</h1>
           <p className="mt-3 text-lg text-muted-foreground">
-            Write a whole Python program, run it, and see the real output. It
-            runs in your browser — nothing is installed and nothing leaves your
-            device.
+            Write a whole program in Python, C, C++, JavaScript, Java or Go.
+            Python runs in your browser; the compiled languages run in a remote
+            sandbox.
           </p>
         </motion.div>
 
         <div className="mt-8 grid gap-5 lg:grid-cols-[16rem_1fr]">
           <aside className="clay h-fit p-5">
             <p className="flex items-center gap-2 text-[11px] font-extrabold uppercase tracking-[0.16em] text-muted-foreground">
-              <Code2 className="size-3.5" /> Starter programs
+              <Code2 className="size-3.5" /> Language
+            </p>
+            <div className="mt-3 grid grid-cols-2 gap-2">
+              {CODE_LANGUAGES.map((entry) => {
+                const active = entry.id === languageId;
+                return (
+                  <button
+                    key={entry.id}
+                    type="button"
+                    onClick={() => loadLanguage(entry.id)}
+                    className={cn(
+                      "rounded-xl px-2.5 py-2 text-[11px] font-extrabold transition",
+                      active
+                        ? "bg-[var(--clay-sky)] text-[var(--clay-sky-ink)] shadow-[inset_0_-2px_0_rgba(60,50,90,0.1)]"
+                        : "bg-[var(--muted)] text-muted-foreground hover:bg-white",
+                    )}
+                  >
+                    {entry.name}
+                  </button>
+                );
+              })}
+            </div>
+
+            <p className="mt-5 flex items-center gap-2 border-t border-border/70 pt-4 text-[11px] font-extrabold uppercase tracking-[0.16em] text-muted-foreground">
+              <Sparkles className="size-3.5" /> {language.name} starters
             </p>
             <div className="mt-3 space-y-2">
-              {STARTERS.map((starter) => {
+              {language.starters.map((starter) => {
                 const active = starter.id === activeStarter;
                 return (
                   <button
@@ -147,8 +183,9 @@ export default function CodeLab() {
 
             <div className="mt-5 border-t border-border/70 pt-4">
               <p className="text-xs font-semibold leading-relaxed text-muted-foreground">
-                Python 3 runs locally with Pyodide. The first run downloads the
-                runtime, so give it a moment.
+                {language.id === "python"
+                  ? "Python 3 runs locally with Pyodide. The first run downloads the runtime, so give it a moment."
+                  : `${language.name} is compiled by the shared Judge0 sandbox. It needs internet, and your source is sent there to run.`}
               </p>
               <Link
                 to="/learn"
@@ -167,9 +204,12 @@ export default function CodeLab() {
                   ⌨️
                 </span>
                 <div>
-                  <p className="font-mono text-xs font-bold">playground.py</p>
+                  <p className="font-mono text-xs font-bold">{language.filename}</p>
                   <p className="text-[11px] font-semibold text-muted-foreground">
-                    Runs in a sandboxed worker · 8 second limit
+                    {language.runtime} ·{" "}
+                    {language.id === "python"
+                      ? "8 second limit"
+                      : "5 second run limit"}
                   </p>
                 </div>
               </div>
@@ -178,8 +218,10 @@ export default function CodeLab() {
                   variant="ghost"
                   size="sm"
                   onClick={() => {
+                    runToken.current += 1;
                     setCode("");
                     setResult(null);
+                    setRunning(false);
                   }}
                   className="rounded-full text-xs font-extrabold text-muted-foreground"
                 >
@@ -190,11 +232,14 @@ export default function CodeLab() {
                   variant="ghost"
                   size="sm"
                   onClick={() => {
+                    runToken.current += 1;
                     setCode(
-                      STARTERS.find((starter) => starter.id === activeStarter)
-                        ?.code ?? STARTERS[0].code,
+                      language.starters.find(
+                        (starter) => starter.id === activeStarter,
+                      )?.code ?? language.starters[0].code,
                     );
                     setResult(null);
+                    setRunning(false);
                   }}
                   className="rounded-full text-xs font-extrabold text-muted-foreground"
                 >
@@ -214,6 +259,7 @@ export default function CodeLab() {
                 </span>
               </div>
               <textarea
+                key={language.id}
                 value={code}
                 onChange={(event) => setCode(event.target.value)}
                 onKeyDown={(event) => {
@@ -229,7 +275,7 @@ export default function CodeLab() {
                   });
                 }}
                 spellCheck={false}
-                aria-label="Python code editor"
+                aria-label={`${language.name} code editor`}
                 rows={18}
                 className="w-full resize-y bg-transparent px-4 py-3 font-mono text-[13px] leading-6 text-[oklch(0.94_0.02_95)] outline-none"
               />
@@ -249,9 +295,7 @@ export default function CodeLab() {
                 {running ? "Running…" : "Run program"}
               </Button>
               <span className="text-xs font-bold text-muted-foreground">
-                {running
-                  ? "First run loads Python — this can take a moment."
-                  : "Output appears below. Errors are safe to read and fix."}
+                {runHint}
               </span>
             </div>
 
@@ -278,7 +322,7 @@ export default function CodeLab() {
                       : "text-muted-foreground",
                   )}
                 >
-                  Console
+                  {language.name} console
                 </p>
               </div>
               <pre

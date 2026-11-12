@@ -70,8 +70,8 @@ export default function Learn() {
           </h1>
           <p className="mt-3 text-lg text-muted-foreground">
             Four paths are open: Python from first line to classes, C and C++
-            down to pointers, and an AI target range. Learn one tiny concept,
-            then prove it.
+            down to pointers, and an AI target range. Every code path ends with
+            real program quests, not just multiple choice.
           </p>
         </motion.div>
 
@@ -253,11 +253,11 @@ export default function Learn() {
                 No multiple choice
               </p>
               <p className="font-display text-xl font-semibold text-[var(--clay-sky-ink)]">
-                Code Lab — write and run a whole Python program
+                Code Lab — write and run whole programs in six languages
               </p>
               <p className="mt-1 text-sm font-semibold text-[var(--clay-sky-ink)] opacity-80">
-                A real editor, a real console. Nothing installs and nothing
-                leaves your browser.
+                A real editor, a real console. Python runs locally; C, C++,
+                JavaScript, Java and Go compile in a sandbox.
               </p>
             </div>
           </div>

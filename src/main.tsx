@@ -166,7 +166,7 @@ createRoot(document.getElementById("root")!).render(
                 element={
                   <RequireAuth
                     title="Sign in to open Code Lab"
-                    description="Write and run full Python programs in your browser."
+                    description="Write and run full programs in Python, C, C++ and more."
                   >
                     <CodeLab />
                   </RequireAuth>

@@ -1,3 +1,12 @@
+/** Every language the Code Lab and code quests can execute. */
+export type CodeLanguageId =
+  | "python"
+  | "c"
+  | "cpp"
+  | "javascript"
+  | "java"
+  | "go";
+
 /** Shared shape for every quest in every language path. */
 
 export type Challenge =
@@ -29,6 +38,8 @@ export type Challenge =
       starter: string;
       expectedOutput: string;
       explanation: string;
+      /** Defaults to the track's own language when omitted. */
+      language?: CodeLanguageId;
     };
 
 /** Optional arcade configuration so a lesson can be played as a shooting round. */
