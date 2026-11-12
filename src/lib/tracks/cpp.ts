@@ -191,7 +191,7 @@ export const CPP_LESSONS: Lesson[] = [
     icon: "🎮",
     summary: "Write a complete C++ program from scratch",
     explanation: [
-      "A whole C++ program has an include, a main function, a loop and a set of branches. std::cout sends each piece of text to the output stream, and the newline escape starts a new line.",
+      "A whole C++ program has an include, a main function, a loop and branches. std::cout sends each piece of text to the output stream, while the newline character starts a new line.",
       "Test n % 15 first. Otherwise a number such as 15 would match n % 3 and print Fizz before the program ever checks for FizzBuzz.",
     ],
     example: {
