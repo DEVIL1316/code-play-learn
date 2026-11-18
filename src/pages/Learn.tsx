@@ -2,6 +2,7 @@ import { GameHeader } from "@/components/GameHeader";
 import { Button } from "@/components/ui/button";
 import { useAuth } from "@/hooks/use-auth";
 import { api } from "@/convex/_generated/api";
+import { CAR_ROUNDS } from "@/lib/car-race";
 import { LANGUAGE_TRACKS, TOTAL_QUESTS, TOTAL_XP } from "@/lib/course";
 import { cn } from "@/lib/utils";
 import { useQuery } from "convex/react";
@@ -11,6 +12,9 @@ import {
   Check,
   Code2,
   Compass,
+  Crosshair,
+  Flag,
+  Gamepad2,
   Sparkles,
   Sprout,
   Trophy,
@@ -26,11 +30,19 @@ export default function Learn() {
     rows.find((row) => row.language === trackId);
   const trackHref = (trackId: string) =>
     trackId === "ai" ? "/learn/ai" : `/learn/${trackId}`;
-  const totalXp = rows.reduce((sum, row) => sum + row.xp, 0);
-  const doneCount = rows.reduce(
+  const trackRows = rows.filter((row) =>
+    LANGUAGE_TRACKS.some((track) => track.id === row.language),
+  );
+  const totalXp = trackRows.reduce((sum, row) => sum + row.xp, 0);
+  const doneCount = trackRows.reduce(
     (sum, row) => sum + row.completedLevels.length,
     0,
   );
+  const aiRow = rowFor("ai");
+  const aiTotal = LANGUAGE_TRACKS.find((track) => track.id === "ai")?.lessons
+    .length;
+  const carRow = rowFor("car");
+  const carDone = carRow?.completedLevels.length ?? 0;
   const percent = Math.min(100, Math.round((doneCount / TOTAL_QUESTS) * 100));
 
   const nextTrack =
@@ -271,6 +283,71 @@ export default function Learn() {
             </Link>
           </Button>
         </motion.div>
+
+        {/* Arcade */}
+        <motion.section
+          initial={{ opacity: 0, y: 18 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ duration: 0.5, delay: 0.36 }}
+          className="mt-8"
+        >
+          <div className="flex flex-wrap items-center justify-between gap-3">
+            <p className="flex items-center gap-2 text-[11px] font-extrabold uppercase tracking-[0.16em] text-muted-foreground">
+              <Gamepad2 className="size-3.5" /> Arcade games
+            </p>
+            <span className="rounded-full bg-[var(--clay-butter)] px-2.5 py-1 text-[10px] font-extrabold uppercase tracking-wider text-[var(--clay-butter-ink)]">
+              2 playable
+            </span>
+          </div>
+          <div className="mt-3 grid gap-4 sm:grid-cols-2">
+            <Link
+              to="/learn/ai"
+              className="clay-tile tone-lilac clay-lift group flex flex-col gap-3 p-5"
+            >
+              <div className="flex items-start justify-between gap-3">
+                <span className="grid size-11 place-items-center rounded-2xl bg-white/60 text-2xl shadow-[inset_0_-3px_6px_rgba(60,50,90,0.12)]">
+                  🎯
+                </span>
+                <Crosshair className="size-5 text-[var(--clay-lilac-ink)] opacity-50 transition group-hover:opacity-100" />
+              </div>
+              <div>
+                <p className="font-display text-xl font-semibold text-[var(--clay-lilac-ink)]">
+                  AI Target Range
+                </p>
+                <p className="mt-1 text-sm font-semibold leading-relaxed text-[var(--clay-lilac-ink)] opacity-80">
+                  Aim, fire and learn how models think.
+                </p>
+              </div>
+              <p className="mt-auto text-[11px] font-extrabold uppercase tracking-wider text-[var(--clay-lilac-ink)] opacity-70">
+                {aiRow?.completedLevels.length ?? 0}/{aiTotal ?? 7} targets ·{" "}
+                {aiRow?.xp ?? 0} XP
+              </p>
+            </Link>
+
+            <Link
+              to="/games/car"
+              className="clay-tile tone-peach clay-lift group flex flex-col gap-3 p-5"
+            >
+              <div className="flex items-start justify-between gap-3">
+                <span className="grid size-11 place-items-center rounded-2xl bg-white/60 text-2xl shadow-[inset_0_-3px_6px_rgba(60,50,90,0.12)]">
+                  🏎️
+                </span>
+                <Flag className="size-5 text-[var(--clay-peach-ink)] opacity-50 transition group-hover:opacity-100" />
+              </div>
+              <div>
+                <p className="font-display text-xl font-semibold text-[var(--clay-peach-ink)]">
+                  Code Rally
+                </p>
+                <p className="mt-1 text-sm font-semibold leading-relaxed text-[var(--clay-peach-ink)] opacity-80">
+                  Steer through the right answer and keep the car moving.
+                </p>
+              </div>
+              <p className="mt-auto text-[11px] font-extrabold uppercase tracking-wider text-[var(--clay-peach-ink)] opacity-70">
+                {carDone}/{CAR_ROUNDS.length} gates · {carRow?.xp ?? 0} XP
+              </p>
+            </Link>
+          </div>
+        </motion.section>
 
         <div className="mt-6 flex flex-wrap items-center justify-center gap-x-6 gap-y-2 text-[11px] font-extrabold uppercase tracking-wider text-muted-foreground">
           <span className="flex items-center gap-1.5">

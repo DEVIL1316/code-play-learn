@@ -298,4 +298,22 @@
     -ms-overflow-style: none;
     scrollbar-width: none;
   }
+
+  /* Code Rally road markings */
+  @keyframes rally-road {
+    from {
+      background-position-y: 0;
+    }
+    to {
+      background-position-y: 56px;
+    }
+  }
+  .rally-road {
+    background-image: repeating-linear-gradient(
+      to bottom,
+      transparent 0 28px,
+      oklch(1 0 0 / 0.42) 28px 56px
+    );
+    animation: rally-road 0.6s linear infinite;
+  }
 }

@@ -46,3 +46,13 @@ export function playHit() {
 export function playMiss() {
   blip(170, 90, 0.18, "sawtooth", 0.035);
 }
+
+export function playBoost() {
+  blip(260, 720, 0.22, "sawtooth", 0.035);
+  window.setTimeout(() => blip(520, 980, 0.16, "triangle", 0.04), 120);
+}
+
+export function playCrash() {
+  blip(120, 48, 0.3, "square", 0.05);
+  window.setTimeout(() => blip(90, 40, 0.22, "sawtooth", 0.03), 90);
+}

@@ -254,6 +254,12 @@ export default function AIShooter() {
               <Crosshair className="size-3" />
               AI target range
             </span>
+            <Link
+              to="/games/car"
+              className="clay-soft flex items-center gap-1.5 rounded-full px-3 py-1.5 text-[10px] font-extrabold uppercase tracking-wider text-[var(--clay-peach-ink)] hover:bg-white/70"
+            >
+              🏎️ Code Rally
+            </Link>
           </div>
 
           <div className="flex items-center gap-3">

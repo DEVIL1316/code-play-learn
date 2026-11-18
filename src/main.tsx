@@ -16,6 +16,7 @@ const Learn = lazy(() => import("./pages/Learn.tsx"));
 const QuestGame = lazy(() => import("./pages/QuestGame.tsx"));
 const AIShooter = lazy(() => import("./pages/AIShooter.tsx"));
 const CodeLab = lazy(() => import("./pages/CodeLab.tsx"));
+const CarRace = lazy(() => import("./pages/CarRace.tsx"));
 const Dashboard = lazy(() => import("./pages/Dashboard.tsx"));
 const NotFound = lazy(() => import("./pages/NotFound.tsx"));
 
@@ -158,6 +159,17 @@ createRoot(document.getElementById("root")!).render(
                     description="Save your XP and pick up exactly where you left off."
                   >
                     <QuestGame />
+                  </RequireAuth>
+                }
+              />
+              <Route
+                path="/games/car"
+                element={
+                  <RequireAuth
+                    title="Sign in to start Code Rally"
+                    description="Steer through code gates, earn XP and keep your rally progress."
+                  >
+                    <CarRace />
                   </RequireAuth>
                 }
               />

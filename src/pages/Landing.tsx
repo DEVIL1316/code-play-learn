@@ -9,6 +9,8 @@ import {
   BookOpen,
   Check,
   Code2,
+  Crosshair,
+  Flag,
   Gamepad2,
   Lightbulb,
   Sparkles,
@@ -31,6 +33,7 @@ export default function Landing() {
     withAuth(trackId === "ai" ? "/learn/ai" : `/learn/${trackId}`);
   const startHref = withAuth("/learn");
   const labHref = withAuth("/lab");
+  const carHref = withAuth("/games/car");
 
   return (
     <div className="relative min-h-screen overflow-x-hidden">
@@ -46,6 +49,7 @@ export default function Landing() {
           <Brand />
           <nav className="hidden items-center gap-1 md:flex">              {[
                 { href: "#paths", label: "Paths" },
+                { href: "#games", label: "Games" },
                 { href: "#how", label: "How it works" },
                 { href: "#sample", label: "Sample quest" },
               ].map((item) => (
@@ -90,7 +94,7 @@ export default function Landing() {
           >
             <span className="clay-soft inline-flex items-center gap-2 rounded-full px-4 py-2 text-xs font-extrabold uppercase tracking-[0.14em] text-[var(--clay-mint-ink)]">
               <Sprout className="size-4" />
-              Beginner-first · 4 paths
+              Beginner-first · 4 paths · 2 games
             </span>
             <h1 className="mt-6 text-balance font-display text-5xl font-semibold leading-[1.02] sm:text-6xl lg:text-[4.2rem]">
               Learn to code.
@@ -100,8 +104,9 @@ export default function Landing() {
             </h1>
             <p className="mt-6 max-w-xl text-lg leading-relaxed text-muted-foreground">
               ClayCode turns Python, C, C++ and AI into {TOTAL_QUESTS} bite-size
-              quests. Read a tiny explanation, play the challenge, and finally
-              understand what every line actually does.
+              quests, plus a target range and a code rally. Read a tiny
+              explanation, play the challenge, and finally understand what every
+              line actually does.
             </p>
             <div className="mt-8 flex flex-col gap-3 sm:flex-row">
               <Button
@@ -318,6 +323,115 @@ export default function Landing() {
                 </motion.article>
               );
             })}
+          </div>
+        </section>
+
+        {/* Arcade games */}
+        <section id="games" className="mx-auto w-full max-w-6xl scroll-mt-24 px-4 pb-20 sm:px-6">
+          <motion.div {...fadeUp} className="max-w-2xl">
+            <span className="font-mono text-xs font-bold uppercase tracking-[0.2em] text-[var(--clay-peach-ink)]">
+              Arcade
+            </span>
+            <h2 className="mt-3 text-4xl font-semibold sm:text-5xl">
+              Play with code. Literally.
+            </h2>
+            <p className="mt-4 text-lg text-muted-foreground">
+              Two fast arcade games sit on top of the lessons. Aim at the right
+              AI target, or steer the clay car through the right code gate —
+              both keep the explanations coming.
+            </p>
+          </motion.div>
+
+          <div className="mt-10 grid gap-5 md:grid-cols-2">
+            <motion.article
+              initial={{ opacity: 0, y: 20 }}
+              whileInView={{ opacity: 1, y: 0 }}
+              viewport={{ once: true, amount: 0.25 }}
+              transition={{ duration: 0.45 }}
+              className="clay-tile tone-lilac flex flex-col gap-4 p-6 sm:p-7"
+            >
+              <div className="flex items-start justify-between gap-3">
+                <span className="grid size-14 place-items-center rounded-2xl bg-white/60 text-3xl shadow-[inset_0_-4px_8px_rgba(60,50,90,0.12)]">
+                  🎯
+                </span>
+                <span className="flex items-center gap-1 rounded-full bg-white/55 px-2.5 py-1 text-[10px] font-extrabold uppercase tracking-wider text-[var(--clay-lilac-ink)]">
+                  <Crosshair className="size-3" /> Gun-style range
+                </span>
+              </div>
+              <div>
+                <h3 className="font-display text-2xl font-semibold text-[var(--clay-lilac-ink)]">
+                  AI Target Range
+                </h3>
+                <p className="mt-1.5 text-sm font-semibold leading-relaxed text-[var(--clay-lilac-ink)] opacity-80">
+                  Take aim at drifting clay targets, fire with three charges and
+                  learn the AI idea behind every hit.
+                </p>
+              </div>
+              <div className="flex flex-wrap gap-1.5">
+                {["aim", "fire", "3 charges", "explanation"].map((tag) => (
+                  <span
+                    key={tag}
+                    className="rounded-full bg-white/50 px-2.5 py-1 text-[11px] font-extrabold text-[var(--clay-lilac-ink)]"
+                  >
+                    {tag}
+                  </span>
+                ))}
+              </div>
+              <Button
+                asChild
+                className="clay-btn mt-auto w-full rounded-xl bg-[var(--clay-lilac-ink)] font-extrabold text-white hover:bg-[var(--clay-lilac-ink)]"
+              >
+                <Link to={trackHref("ai")}>
+                  Play the range
+                  <ArrowRight className="size-4" />
+                </Link>
+              </Button>
+            </motion.article>
+
+            <motion.article
+              initial={{ opacity: 0, y: 20 }}
+              whileInView={{ opacity: 1, y: 0 }}
+              viewport={{ once: true, amount: 0.25 }}
+              transition={{ duration: 0.45, delay: 0.08 }}
+              className="clay-tile tone-peach flex flex-col gap-4 p-6 sm:p-7"
+            >
+              <div className="flex items-start justify-between gap-3">
+                <span className="grid size-14 place-items-center rounded-2xl bg-white/60 text-3xl shadow-[inset_0_-4px_8px_rgba(60,50,90,0.12)]">
+                  🏎️
+                </span>
+                <span className="flex items-center gap-1 rounded-full bg-white/55 px-2.5 py-1 text-[10px] font-extrabold uppercase tracking-wider text-[var(--clay-peach-ink)]">
+                  <Flag className="size-3" /> Car game
+                </span>
+              </div>
+              <div>
+                <h3 className="font-display text-2xl font-semibold text-[var(--clay-peach-ink)]">
+                  Code Rally
+                </h3>
+                <p className="mt-1.5 text-sm font-semibold leading-relaxed text-[var(--clay-peach-ink)] opacity-80">
+                  Pick the right gate, boost the clay car and dodge the cones.
+                  Nine quick code questions across Python, C and C++.
+                </p>
+              </div>
+              <div className="flex flex-wrap gap-1.5">
+                {["3 answer lanes", "2 repairs", "speed boost", "9 gates"].map((tag) => (
+                  <span
+                    key={tag}
+                    className="rounded-full bg-white/50 px-2.5 py-1 text-[11px] font-extrabold text-[var(--clay-peach-ink)]"
+                  >
+                    {tag}
+                  </span>
+                ))}
+              </div>
+              <Button
+                asChild
+                className="clay-btn mt-auto w-full rounded-xl bg-[var(--clay-peach-ink)] font-extrabold text-white hover:bg-[var(--clay-peach-ink)]"
+              >
+                <Link to={carHref}>
+                  Start the rally
+                  <ArrowRight className="size-4" />
+                </Link>
+              </Button>
+            </motion.article>
           </div>
         </section>
 
@@ -588,6 +702,7 @@ export default function Landing() {
           </p>
           <div className="flex items-center gap-4 text-xs font-bold text-muted-foreground">
             <a href="#paths" className="hover:text-foreground">Paths</a>
+            <a href="#games" className="hover:text-foreground">Games</a>
             <a href="#how" className="hover:text-foreground">How it works</a>
             <Link to={labHref} className="hover:text-foreground">Code Lab</Link>
             <Link to={startHref} className="hover:text-foreground">Play</Link>
