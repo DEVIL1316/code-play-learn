@@ -2,7 +2,7 @@ import { GameHeader } from "@/components/GameHeader";
 import { Button } from "@/components/ui/button";
 import { useAuth } from "@/hooks/use-auth";
 import { api } from "@/convex/_generated/api";
-import { CAR_ROUNDS } from "@/lib/car-race";
+import { RALLY_MISSIONS } from "@/lib/car-race";
 import { LANGUAGE_TRACKS, TOTAL_QUESTS, TOTAL_XP } from "@/lib/course";
 import { cn } from "@/lib/utils";
 import { useQuery } from "convex/react";
@@ -41,7 +41,7 @@ export default function Learn() {
   const aiRow = rowFor("ai");
   const aiTotal = LANGUAGE_TRACKS.find((track) => track.id === "ai")?.lessons
     .length;
-  const carRow = rowFor("car");
+  const carRow = rowFor("rally");
   const carDone = carRow?.completedLevels.length ?? 0;
   const percent = Math.min(100, Math.round((doneCount / TOTAL_QUESTS) * 100));
 
@@ -339,11 +339,11 @@ export default function Learn() {
                   Code Rally
                 </p>
                 <p className="mt-1 text-sm font-semibold leading-relaxed text-[var(--clay-peach-ink)] opacity-80">
-                  Steer through the right answer and keep the car moving.
+                  Drive, collect code pieces in order and dodge bugs.
                 </p>
               </div>
               <p className="mt-auto text-[11px] font-extrabold uppercase tracking-wider text-[var(--clay-peach-ink)] opacity-70">
-                {carDone}/{CAR_ROUNDS.length} gates · {carRow?.xp ?? 0} XP
+                {carDone}/{RALLY_MISSIONS.length} lines built · {carRow?.xp ?? 0} XP
               </p>
             </Link>
           </div>

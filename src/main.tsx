@@ -167,7 +167,7 @@ createRoot(document.getElementById("root")!).render(
                 element={
                   <RequireAuth
                     title="Sign in to start Code Rally"
-                    description="Steer through code gates, earn XP and keep your rally progress."
+                    description="Drive, collect code pieces, dodge bugs and keep your rally progress."
                   >
                     <CarRace />
                   </RequireAuth>

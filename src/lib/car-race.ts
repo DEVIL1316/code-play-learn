@@ -1,92 +1,94 @@
-import { LANGUAGE_TRACKS } from "@/lib/course";
-import type { Challenge } from "@/lib/track-types";
-
-export type CarRound = {
+/** The code lines the player builds by collecting falling pieces in Code Rally. */
+export type RallyMission = {
   id: string;
-  language: string;
-  languageName: string;
+  language: "Python" | "C" | "C++";
   tone: string;
   title: string;
-  prompt: string;
-  code?: string;
-  options: string[];
-  answer: number;
+  goal: string;
+  tokens: string[];
+  code: string;
   explanation: string;
   xp: number;
 };
 
-/** Review gates pulled from the three code paths. */
-const PICKS = [
-  { track: "python", lesson: "math" },
-  { track: "python", lesson: "lists" },
-  { track: "python", lesson: "return-values" },
-  { track: "c", lesson: "c-hello" },
-  { track: "c", lesson: "c-for" },
-  { track: "c", lesson: "c-arrays" },
-  { track: "cpp", lesson: "cpp-if" },
-  { track: "cpp", lesson: "cpp-range-for" },
-  { track: "cpp", lesson: "cpp-vector" },
-] as const;
+const XP_PER_MISSION = 30;
 
-const XP_PER_GATE = 20;
+export const RALLY_MISSIONS: RallyMission[] = [
+  {
+    id: "rally-py-print",
+    language: "Python",
+    tone: "tone-mint",
+    title: "Say hello",
+    goal: "Collect the pieces in order to build a print call.",
+    tokens: ["print(", '"Hello, clay!"', ")"],
+    code: 'print("Hello, clay!")',
+    explanation:
+      "print() shows text on screen. The quotes mark the string, and the closing parenthesis finishes the call.",
+    xp: XP_PER_MISSION,
+  },
+  {
+    id: "rally-py-if",
+    language: "Python",
+    tone: "tone-mint",
+    title: "Take the branch",
+    goal: "Build a comparison that decides whether a score passes.",
+    tokens: ["if score", ">= 60", ":"],
+    code: "if score >= 60:",
+    explanation:
+      "if checks a condition. >= means “at least”, and the colon opens the indented block that runs when the score passes.",
+    xp: XP_PER_MISSION,
+  },
+  {
+    id: "rally-c-print",
+    language: "C",
+    tone: "tone-sky",
+    title: "C hello",
+    goal: "Build a complete printf statement, semicolon included.",
+    tokens: ["printf(", '"Hi, C!\\n"', ");"],
+    code: 'printf("Hi, C!\\n");',
+    explanation:
+      "printf writes formatted text. \\n starts a new line, and the semicolon tells C that the statement is finished.",
+    xp: XP_PER_MISSION,
+  },
+  {
+    id: "rally-c-loop",
+    language: "C",
+    tone: "tone-sky",
+    title: "Count three times",
+    goal: "Build the header of a C for loop.",
+    tokens: ["for (int i = 0;", "i < 3;", "i++)"],
+    code: "for (int i = 0; i < 3; i++)",
+    explanation:
+      "A C for loop has three parts: where i starts, how long it keeps going, and how it changes after every pass.",
+    xp: XP_PER_MISSION,
+  },
+  {
+    id: "rally-cpp-cout",
+    language: "C++",
+    tone: "tone-peach",
+    title: "Stream a greeting",
+    goal: "Build a std::cout line that prints and ends with a new line.",
+    tokens: ["std::cout", '<< "Hi"', "<< std::endl;"],
+    code: 'std::cout << "Hi" << std::endl;',
+    explanation:
+      "std::cout is the output stream. Each << sends a value into it, and std::endl ends the line.",
+    xp: XP_PER_MISSION,
+  },
+  {
+    id: "rally-cpp-vector",
+    language: "C++",
+    tone: "tone-peach",
+    title: "Load the scores",
+    goal: "Build a vector declaration with three starting scores.",
+    tokens: ["std::vector<int>", "scores", "= {10, 20, 30};"],
+    code: "std::vector<int> scores = {10, 20, 30};",
+    explanation:
+      "A std::vector is a resizable list. The type in angle brackets says what it stores, and the braces provide its first values.",
+    xp: XP_PER_MISSION,
+  },
+];
 
-function makeRound({
-  track,
-  lesson,
-}: {
-  track: string;
-  lesson: string;
-}): CarRound | null {
-  const languageTrack = LANGUAGE_TRACKS.find((entry) => entry.id === track);
-  const source = languageTrack?.lessons.find((entry) => entry.id === lesson);
-  if (!languageTrack || !source) return null;
-
-  const challenge: Challenge = source.challenge;
-  if (challenge.kind !== "choice" && challenge.kind !== "blank") return null;
-
-  return {
-    id: source.id,
-    language: track,
-    languageName: languageTrack.name,
-    tone: languageTrack.tone,
-    title: source.title,
-    prompt: challenge.prompt,
-    code: challenge.code,
-    options: challenge.options,
-    answer: challenge.answer,
-    explanation: challenge.explanation,
-    xp: XP_PER_GATE,
-  };
-}
-
-export const CAR_ROUNDS = PICKS.map(makeRound).filter(
-  (round): round is CarRound => round !== null,
-);
-
-export const CAR_TOTAL_XP = CAR_ROUNDS.reduce(
-  (sum, round) => sum + round.xp,
+export const RALLY_TOTAL_XP = RALLY_MISSIONS.reduce(
+  (sum, mission) => sum + mission.xp,
   0,
 );
-
-export function shuffle<T>(items: T[]): T[] {
-  const copy = [...items];
-  for (let i = copy.length - 1; i > 0; i -= 1) {
-    const j = Math.floor(Math.random() * (i + 1));
-    [copy[i], copy[j]] = [copy[j], copy[i]];
-  }
-  return copy;
-}
-
-export type CarGate = { text: string; correct: boolean };
-
-/** Three readable gates per round, always including the correct answer. */
-export function buildGates(round: CarRound): CarGate[] {
-  const correct = round.options[round.answer];
-  const wrong = round.options.filter((_, index) => index !== round.answer);
-  return shuffle([
-    { text: correct, correct: true },
-    ...shuffle(wrong)
-      .slice(0, 2)
-      .map((text) => ({ text, correct: false })),
-  ]);
-}

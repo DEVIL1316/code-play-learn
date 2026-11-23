@@ -337,8 +337,8 @@ export default function Landing() {
             </h2>
             <p className="mt-4 text-lg text-muted-foreground">
               Two fast arcade games sit on top of the lessons. Aim at the right
-              AI target, or steer the clay car through the right code gate —
-              both keep the explanations coming.
+              AI target, or drive the clay car, collect code pieces and dodge
+              bugs — both keep the explanations coming.
             </p>
           </motion.div>
 
@@ -408,12 +408,12 @@ export default function Landing() {
                   Code Rally
                 </h3>
                 <p className="mt-1.5 text-sm font-semibold leading-relaxed text-[var(--clay-peach-ink)] opacity-80">
-                  Pick the right gate, boost the clay car and dodge the cones.
-                  Nine quick code questions across Python, C and C++.
+                  Steer a real lane-driving car, collect code pieces in order and
+                  dodge bugs across six Python, C and C++ lines.
                 </p>
               </div>
               <div className="flex flex-wrap gap-1.5">
-                {["3 answer lanes", "2 repairs", "speed boost", "9 gates"].map((tag) => (
+                {["arrow-key steering", "collect pieces", "dodge bugs", "6 lines"].map((tag) => (
                   <span
                     key={tag}
                     className="rounded-full bg-white/50 px-2.5 py-1 text-[11px] font-extrabold text-[var(--clay-peach-ink)]"

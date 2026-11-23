@@ -1,8 +1,12 @@
 import { GameHeader } from "@/components/GameHeader";
 import { Button } from "@/components/ui/button";
 import { api } from "@/convex/_generated/api";
-import { CAR_ROUNDS, buildGates, type CarRound } from "@/lib/car-race";
-import { playBoost, playCrash } from "@/lib/sfx";
+import {
+  RALLY_MISSIONS,
+  RALLY_TOTAL_XP,
+  type RallyMission,
+} from "@/lib/car-race";
+import { playBoost, playCrash, playMiss } from "@/lib/sfx";
 import { cn } from "@/lib/utils";
 import { useMutation, useQuery } from "convex/react";
 import { motion } from "framer-motion";
@@ -15,234 +19,350 @@ import {
   Flag,
   Gauge,
   Loader2,
+  Play,
   RotateCcw,
   Sparkles,
   Volume2,
   VolumeX,
   Wrench,
-  X,
 } from "lucide-react";
 import { useEffect, useMemo, useRef, useState } from "react";
 import { Link } from "react-router";
 
-type Phase = "intro" | "race" | "result" | "complete";
+type Phase = "intro" | "driving" | "complete";
 
-const START_TRIES = 2;
 const LANE_X = [22, 50, 78];
-const LANE_LABELS = ["A", "B", "C"];
-const LANE_TONES = ["tone-mint", "tone-sky", "tone-butter"];
+const CAR_TOP = 77;
+const CAR_BOTTOM = 98;
+const START_LIVES = 3;
 
-type Flash = { key: number; text: string; positive: boolean };
+type EntityKind = "token" | "bug";
+
+type Entity = {
+  id: number;
+  lane: number;
+  y: number;
+  kind: EntityKind;
+  text: string;
+  step: number;
+};
+
+type RallyEvent = {
+  key: number;
+  text: string;
+  tone: "good" | "wrong" | "bug";
+};
+
+type GameState = {
+  lane: number;
+  entities: Entity[];
+  step: number;
+  lives: number;
+  score: number;
+  speed: number;
+  distance: number;
+  spawnIn: number;
+  entitySeq: number;
+  eventSeq: number;
+  event: RallyEvent | null;
+};
+
+function initialGame(): GameState {
+  return {
+    lane: 1,
+    entities: [],
+    step: 0,
+    lives: START_LIVES,
+    score: 0,
+    speed: 42,
+    distance: 0,
+    spawnIn: 0.3,
+    entitySeq: 0,
+    eventSeq: 0,
+    event: null,
+  };
+}
+
+/** Move the road, spawn pieces, and resolve collisions for one animation frame. */
+function advanceGame(
+  game: GameState,
+  dt: number,
+  mission: RallyMission,
+): GameState {
+  if (game.step >= mission.tokens.length || game.lives <= 0) return game;
+
+  const fallSpeed = 25 + game.speed * 0.14;
+  let entitySeq = game.entitySeq;
+  let eventSeq = game.eventSeq;
+  let entities = game.entities.map((entity) => ({
+    ...entity,
+    y: entity.y + fallSpeed * dt,
+  }));
+  let spawnIn = game.spawnIn - dt;
+  let event = game.event;
+
+  if (spawnIn <= 0 && game.step < mission.tokens.length) {
+    const lane = Math.floor(Math.random() * 3);
+    const roll = Math.random();
+    let kind: EntityKind = "bug";
+    let step = 0;
+    let text = "BUG";
+
+    if (roll < 0.5) {
+      kind = "token";
+      step = game.step;
+      text = mission.tokens[step];
+    } else if (roll < 0.8) {
+      const otherSteps = mission.tokens
+        .map((_, index) => index)
+        .filter((index) => index !== game.step);
+      if (otherSteps.length > 0) {
+        kind = "token";
+        step = otherSteps[Math.floor(Math.random() * otherSteps.length)];
+        text = mission.tokens[step];
+      } else {
+        kind = "token";
+        step = game.step;
+        text = mission.tokens[step];
+      }
+    }
+
+    entities = [
+      ...entities,
+      { id: ++entitySeq, lane, y: -8, kind, step, text },
+    ];
+    spawnIn = 0.82;
+  }
+
+  let step = game.step;
+  let lives = game.lives;
+  let score = game.score;
+  let speed = game.speed;
+  const survivors: Entity[] = [];
+
+  for (const entity of entities) {
+    if (
+      entity.lane === game.lane &&
+      entity.y > CAR_TOP &&
+      entity.y < CAR_BOTTOM
+    ) {
+      if (entity.kind === "bug") {
+        lives = Math.max(0, lives - 1);
+        speed = Math.max(16, speed - 10);
+        event = { key: ++eventSeq, tone: "bug", text: "Bug! −1 repair" };
+      } else if (entity.step === step) {
+        step += 1;
+        score += 10;
+        speed = Math.min(99, speed + 5);
+        event =
+          step >= mission.tokens.length
+            ? { key: ++eventSeq, tone: "good", text: "Line complete!" }
+            : { key: ++eventSeq, tone: "good", text: `+ ${entity.text}` };
+      } else {
+        score = Math.max(0, score - 2);
+        speed = Math.max(16, speed - 3);
+        event = {
+          key: ++eventSeq,
+          tone: "wrong",
+          text: "Not yet — follow the coach",
+        };
+      }
+      continue;
+    }
+
+    if (entity.y < 108) survivors.push(entity);
+  }
+
+  return {
+    ...game,
+    entities: survivors,
+    step,
+    lives,
+    score,
+    speed: Math.min(99, speed + dt * 0.7),
+    distance: game.distance + speed * dt * 0.06,
+    spawnIn,
+    entitySeq,
+    eventSeq,
+    event,
+  };
+}
 
 export default function CarRace() {
-  const progress = useQuery(api.progress.getProgress, { language: "car" });
+  const progress = useQuery(api.progress.getProgress, { language: "rally" });
   const completeLevel = useMutation(api.progress.completeLevel);
   const resetProgress = useMutation(api.progress.resetProgress);
 
   const [activeIndex, setActiveIndex] = useState<number | null>(null);
   const [phase, setPhase] = useState<Phase>("intro");
-  const [tries, setTries] = useState(START_TRIES);
-  const [spent, setSpent] = useState<string[]>([]);
-  const [locked, setLocked] = useState(false);
-  const [correct, setCorrect] = useState<boolean | null>(null);
-  const [lastPick, setLastPick] = useState<string | null>(null);
-  const [lane, setLane] = useState(1);
-  const [wrongShake, setWrongShake] = useState(false);
+  const [game, setGame] = useState<GameState>(() => initialGame());
   const [replay, setReplay] = useState(false);
-  const [streak, setStreak] = useState(0);
-  const [solved, setSolved] = useState(0);
-  const [speed, setSpeed] = useState(42);
   const [soundOn, setSoundOn] = useState(true);
-  const [flash, setFlash] = useState<Flash | null>(null);
-
-  const timer = useRef<number | null>(null);
-  const shakeTimer = useRef<number | null>(null);
-  const flashKey = useRef(0);
-
-  useEffect(() => {
-    return () => {
-      if (timer.current) window.clearTimeout(timer.current);
-      if (shakeTimer.current) window.clearTimeout(shakeTimer.current);
-    };
-  }, []);
+  const lastSoundKey = useRef(0);
 
   const completedIds = progress?.completedLevels ?? [];
   const xp = progress?.xp ?? 0;
 
   const resumeIndex = useMemo(() => {
     if (!progress) return 0;
-    const next = CAR_ROUNDS.findIndex(
-      (round) => !progress.completedLevels.includes(round.id),
+    const next = RALLY_MISSIONS.findIndex(
+      (mission) => !progress.completedLevels.includes(mission.id),
     );
-    return next === -1 ? CAR_ROUNDS.length : next;
+    return next === -1 ? RALLY_MISSIONS.length : next;
   }, [progress]);
 
   const currentIndex = activeIndex ?? resumeIndex;
-  const finished = currentIndex >= CAR_ROUNDS.length;
-  const round = finished ? null : CAR_ROUNDS[currentIndex];
-  const gates = useMemo(() => (round ? buildGates(round) : []), [round]);
-  const correctText = round ? round.options[round.answer] : "";
+  const finished = currentIndex >= RALLY_MISSIONS.length;
+  const mission = finished ? null : RALLY_MISSIONS[currentIndex];
+  const step = mission ? Math.min(game.step, mission.tokens.length) : 0;
+  const missionComplete = !!mission && game.step >= mission.tokens.length;
+  const missionFailed = !!mission && game.lives <= 0;
+  const isDriving = phase === "driving" && !missionComplete && !missionFailed;
+  const savedMission = useRef<string | null>(null);
 
-  function clearTimers() {
-    if (timer.current) window.clearTimeout(timer.current);
-    if (shakeTimer.current) window.clearTimeout(shakeTimer.current);
-    timer.current = null;
-    shakeTimer.current = null;
-  }
+  useEffect(() => {
+    return () => {
+      lastSoundKey.current = 0;
+    };
+  }, []);
 
-  function saveLevel(target: CarRound) {
+  /* One requestAnimationFrame loop drives the whole road. */
+  useEffect(() => {
+    if (!isDriving || !mission) return;
+    let raf = 0;
+    let previous = performance.now();
+
+    const tick = (now: number) => {
+      const dt = Math.min((now - previous) / 1000, 0.05);
+      previous = now;
+      setGame((current) => advanceGame(current, dt, mission));
+      raf = requestAnimationFrame(tick);
+    };
+
+    raf = requestAnimationFrame(tick);
+    return () => cancelAnimationFrame(raf);
+  }, [isDriving, mission]);
+
+  /* Award XP once when the line is built; the result screen is derived. */
+  useEffect(() => {
+    if (!mission || !missionComplete || replay) return;
+    if (savedMission.current === mission.id) return;
+    savedMission.current = mission.id;
     completeLevel({
-      language: "car",
-      levelId: target.id,
-      xp: target.xp,
-    }).catch((error) => console.error("Could not save rally progress:", error));
+      language: "rally",
+      levelId: mission.id,
+      xp: mission.xp,
+    }).catch((error) =>
+      console.error("Could not save rally progress:", error),
+    );
+  }, [mission, missionComplete, replay, completeLevel]);
+
+  /* Sound is a side effect of game events so collisions never repeat audio. */
+  useEffect(() => {
+    const event = game.event;
+    if (!event || event.key === lastSoundKey.current) return;
+    lastSoundKey.current = event.key;
+    if (!soundOn) return;
+    if (event.tone === "good") playBoost();
+    else if (event.tone === "bug") playCrash();
+    else playMiss();
+  }, [game.event, soundOn]);
+
+  /* Keyboard steering. Touch players get the same controls on screen. */
+  useEffect(() => {
+    if (!isDriving) return;
+
+    const onKeyDown = (event: KeyboardEvent) => {
+      const key = event.key.toLowerCase();
+      if (key === "arrowleft" || key === "a") {
+        event.preventDefault();
+        setGame((current) => ({
+          ...current,
+          lane: Math.max(0, current.lane - 1),
+        }));
+      } else if (key === "arrowright" || key === "d") {
+        event.preventDefault();
+        setGame((current) => ({
+          ...current,
+          lane: Math.min(2, current.lane + 1),
+        }));
+      } else if (key === "1" || key === "2" || key === "3") {
+        event.preventDefault();
+        setGame((current) => ({ ...current, lane: Number(key) - 1 }));
+      }
+    };
+
+    window.addEventListener("keydown", onKeyDown);
+    return () => window.removeEventListener("keydown", onKeyDown);
+  }, [isDriving]);
+
+  function moveLane(direction: number) {
+    if (phase !== "driving") return;
+    setGame((current) => ({
+      ...current,
+      lane: Math.max(0, Math.min(2, current.lane + direction)),
+    }));
   }
 
-  function resetRoundState() {
-    setTries(START_TRIES);
-    setSpent([]);
-    setLocked(false);
-    setCorrect(null);
-    setLastPick(null);
-    setLane(1);
-    setWrongShake(false);
-    setFlash(null);
-  }
-
-  function beginRun(index: number) {
-    clearTimers();
-    const target = CAR_ROUNDS[index];
-    setActiveIndex(index >= CAR_ROUNDS.length ? CAR_ROUNDS.length : index);
-    setReplay(!!target && completedIds.includes(target.id));
-    setPhase(index >= CAR_ROUNDS.length ? "complete" : "race");
-    setTries(START_TRIES);
-    setSpent([]);
-    setLocked(false);
-    setCorrect(null);
-    setLastPick(null);
-    setLane(1);
-    setWrongShake(false);
-    setFlash(null);
-    setStreak(0);
-    setSolved(0);
-    setSpeed(42);
+  function beginMission(index: number) {
+    const nextMission = RALLY_MISSIONS[index];
+    if (!nextMission) {
+      setActiveIndex(RALLY_MISSIONS.length);
+      setPhase("complete");
+      return;
+    }
+    setActiveIndex(index);
+    setReplay(completedIds.includes(nextMission.id));
+    savedMission.current = null;
+    lastSoundKey.current = 0;
+    setGame(initialGame());
+    setPhase("driving");
     window.scrollTo({ top: 0, behavior: "smooth" });
   }
 
-  function retryGate() {
-    clearTimers();
-    setTries(START_TRIES);
-    setSpent([]);
-    setLocked(false);
-    setCorrect(null);
-    setLastPick(null);
-    setLane(1);
-    setWrongShake(false);
-    setFlash(null);
-    setPhase("race");
+  function startRun() {
+    beginMission(resumeIndex);
+  }
+
+  function retryMission() {
+    savedMission.current = null;
+    lastSoundKey.current = 0;
+    setGame(initialGame());
+    setPhase("driving");
     window.scrollTo({ top: 0, behavior: "smooth" });
   }
 
-  function goNext() {
-    if (!round) return;
-    clearTimers();
+  function nextMission() {
+    if (!mission) return;
     const next = currentIndex + 1;
-    if (next >= CAR_ROUNDS.length) {
-      setActiveIndex(CAR_ROUNDS.length);
+    if (next >= RALLY_MISSIONS.length) {
+      setActiveIndex(RALLY_MISSIONS.length);
       setPhase("complete");
       window.scrollTo({ top: 0, behavior: "smooth" });
       return;
     }
-    setActiveIndex(next);
-    setReplay(completedIds.includes(CAR_ROUNDS[next].id));
-    resetRoundState();
-    setPhase("race");
-    window.scrollTo({ top: 0, behavior: "smooth" });
-  }
-
-  function choose(index: number) {
-    if (phase !== "race" || locked || !round) return;
-    const gate = gates[index];
-    if (!gate || spent.includes(gate.text)) return;
-
-    setLane(index);
-    setLastPick(gate.text);
-
-    if (gate.correct) {
-      setLocked(true);
-      setCorrect(true);
-      setStreak((current) => current + 1);
-      setSolved((current) => current + 1);
-      setSpeed((current) => Math.min(99, current + 14));
-      if (!replay) saveLevel(round);
-      if (soundOn) playBoost();
-      setFlash({
-        key: ++flashKey.current,
-        text: replay ? "Gate cleared" : `+${round.xp} XP`,
-        positive: true,
-      });
-      timer.current = window.setTimeout(() => setPhase("result"), 950);
-      return;
-    }
-
-    const nextTries = tries - 1;
-    setTries(nextTries);
-    setStreak(0);
-    setSpeed((current) => Math.max(18, current - 8));
-    setSpent((current) =>
-      current.includes(gate.text) ? current : [...current, gate.text],
-    );
-    setCorrect(false);
-    setWrongShake(true);
-    if (soundOn) playCrash();
-    setFlash({
-      key: ++flashKey.current,
-      text:
-        nextTries > 0
-          ? `Cone! ${nextTries} ${nextTries === 1 ? "repair" : "repairs"} left`
-          : "Breakdown!",
-      positive: false,
-    });
-
-    if (shakeTimer.current) window.clearTimeout(shakeTimer.current);
-    shakeTimer.current = window.setTimeout(() => setWrongShake(false), 500);
-
-    if (nextTries <= 0) {
-      setLocked(true);
-      timer.current = window.setTimeout(() => setPhase("result"), 950);
-    } else {
-      setLocked(true);
-      timer.current = window.setTimeout(() => {
-        setLocked(false);
-        setLane(1);
-        setLastPick(null);
-        setCorrect(null);
-      }, 620);
-    }
+    beginMission(next);
   }
 
   async function handleRestart() {
     const ok =
       completedIds.length === 0 ||
       window.confirm(
-        "Reset Code Rally? Your cleared gates and rally XP will be wiped.",
+        "Reset Code Rally? Your built lines and rally XP will be wiped.",
       );
     if (!ok) return;
-    clearTimers();
     try {
-      await resetProgress({ language: "car" });
+      await resetProgress({ language: "rally" });
       setActiveIndex(null);
       setPhase("intro");
-      resetRoundState();
-      setStreak(0);
-      setSolved(0);
-      setSpeed(42);
+      savedMission.current = null;
+      setGame(initialGame());
     } catch (error) {
       console.error("Could not reset rally progress:", error);
     }
   }
 
-  const progressDots = CAR_ROUNDS.map((item, index) => {
+  const progressDots = RALLY_MISSIONS.map((item, index) => {
     const done = completedIds.includes(item.id);
     return (
       <span
@@ -322,7 +442,7 @@ export default function CarRace() {
           <div className="clay grid min-h-64 place-items-center p-8">
             <div className="flex flex-col items-center gap-3 text-muted-foreground">
               <Loader2 className="size-6 animate-spin" />
-              <p className="text-sm font-bold">Warming up the engine…</p>
+              <p className="text-sm font-bold">Fueling the rally car…</p>
             </div>
           </div>
         ) : finished ? (
@@ -338,8 +458,8 @@ export default function CarRace() {
               Rally complete!
             </h1>
             <p className="mx-auto mt-3 max-w-md text-muted-foreground">
-              You cleared all {CAR_ROUNDS.length} gates and earned {xp} rally XP.
-              The code paths just got faster.
+              You built all {RALLY_MISSIONS.length} lines and earned {xp} rally
+              XP. The car is still running — that is how you know it compiled.
             </p>
             <div className="mt-8 flex flex-col items-center justify-center gap-3 sm:flex-row">
               <Button asChild className="clay-btn h-12 rounded-2xl px-6 font-extrabold">
@@ -368,49 +488,50 @@ export default function CarRace() {
               <div>
                 <span className="inline-flex items-center gap-2 rounded-full bg-[var(--clay-butter)] px-3.5 py-1.5 text-[11px] font-extrabold uppercase tracking-widest text-[var(--clay-butter-ink)]">
                   <Sparkles className="size-3.5" />
-                  Arcade game · {CAR_ROUNDS.length} gates
+                  Real driving game · {RALLY_MISSIONS.length} lines
                 </span>
                 <h1 className="mt-5 font-display text-4xl font-semibold sm:text-5xl">
                   Code Rally
                 </h1>
                 <p className="mt-4 max-w-xl text-base font-semibold leading-relaxed text-muted-foreground">
-                  Drive the clay car through the right answer. Three answer
-                  gates, two repairs, and a whole lot of road. Every gate is a
-                  tiny code idea with an explanation at the finish line.
+                  Drive the clay car down the code highway. Collect the highlighted
+                  pieces in order to build each line, dodge bugs, and keep your
+                  repairs for the rough patches.
                 </p>
+
                 <div className="mt-6 grid gap-2.5 sm:grid-cols-2">
                   {[
-                    "Pick the correct code gate",
-                    "Correct answers boost your speed",
-                    "Wrong gates cost a repair",
-                    "Explanations after every gate",
+                    { icon: "← →", text: "Steer with arrows, A / D or the buttons" },
+                    { icon: "🧩", text: "Collect the next piece in the coach" },
+                    { icon: "🐞", text: "Bugs cost one repair — dodge them" },
+                    { icon: "⚡", text: "Correct pieces boost speed" },
                   ].map((item) => (
                     <div
-                      key={item}
+                      key={item.text}
                       className="flex items-start gap-2.5 rounded-xl bg-white/65 px-3.5 py-2.5"
                     >
-                      <Check
-                        className="mt-0.5 size-3.5 shrink-0 text-[var(--clay-mint-ink)]"
-                        strokeWidth={3.5}
-                      />
+                      <span className="mt-0.5 grid size-6 shrink-0 place-items-center rounded-full bg-white/80 font-mono text-[10px] font-extrabold text-[var(--clay-peach-ink)]">
+                        {item.icon}
+                      </span>
                       <span className="text-xs font-bold text-foreground/80">
-                        {item}
+                        {item.text}
                       </span>
                     </div>
                   ))}
                 </div>
+
                 <div className="mt-7 flex flex-wrap items-center gap-3">
                   <Button
-                    onClick={() => beginRun(resumeIndex)}
+                    onClick={startRun}
                     size="lg"
                     className="clay-btn h-12 rounded-2xl bg-[var(--clay-peach-ink)] px-6 font-extrabold text-white hover:bg-[var(--clay-peach-ink)]"
                   >
-                    <Flag className="size-4" />
-                    {completedIds.length > 0 ? "Resume the rally" : "Start the rally"}
+                    <Play className="size-4 fill-current" />
+                    {completedIds.length > 0 ? "Resume the rally" : "Start the engine"}
                   </Button>
                   <span className="text-xs font-bold text-muted-foreground">
-                    {completedIds.length}/{CAR_ROUNDS.length} gates cleared ·{" "}
-                    {xp} XP
+                    {completedIds.length}/{RALLY_MISSIONS.length} lines built ·{" "}
+                    {xp}/{RALLY_TOTAL_XP} XP
                   </span>
                 </div>
               </div>
@@ -429,14 +550,11 @@ export default function CarRace() {
                       style={{ left: `${x}%` }}
                     />
                   ))}
+                  <div className="absolute left-4 top-4 max-w-[84%] truncate rounded-full bg-black/25 px-3 py-1.5 font-mono text-[10px] font-bold uppercase tracking-widest text-white/60">
+                    Build: {RALLY_MISSIONS[resumeIndex]?.code ?? "all lines done"}
+                  </div>
                   <div className="absolute bottom-4 left-1/2 -translate-x-1/2">
                     <Car />
-                  </div>
-                  <div className="absolute left-4 top-4 rounded-full bg-black/25 px-3 py-1.5 font-mono text-[10px] font-bold uppercase tracking-widest text-white/60">
-                    Gate {currentIndex + 1} of {CAR_ROUNDS.length}
-                  </div>
-                  <div className="clay-soft absolute -right-2 top-6 rotate-6 rounded-2xl bg-[var(--clay-butter)] px-3.5 py-2 text-xs font-extrabold text-[var(--clay-butter-ink)]">
-                    Ready?
                   </div>
                 </div>
                 <div className="clay-soft absolute -bottom-4 left-4 flex items-center gap-2 rounded-2xl px-3.5 py-2 text-xs font-extrabold text-[var(--clay-peach-ink)]">
@@ -444,10 +562,34 @@ export default function CarRace() {
                 </div>
               </div>
             </div>
+
+            <div className="mt-8 grid gap-2 sm:grid-cols-2 lg:grid-cols-3">
+              {RALLY_MISSIONS.map((item, index) => {
+                const done = completedIds.includes(item.id);
+                return (
+                  <div
+                    key={item.id}
+                    className={cn(
+                      "flex items-center gap-2.5 rounded-xl px-3 py-2.5 text-xs font-bold",
+                      done
+                        ? "bg-[var(--clay-mint)] text-[var(--clay-mint-ink)]"
+                        : "bg-white/55 text-muted-foreground",
+                    )}
+                  >
+                    <span className="grid size-5 shrink-0 place-items-center rounded-full bg-white/70 text-[10px] font-extrabold">
+                      {done ? <Check className="size-3" strokeWidth={3.5} /> : index + 1}
+                    </span>
+                    <span className="truncate">
+                      {item.language} · {item.title}
+                    </span>
+                  </div>
+                );
+              })}
+            </div>
           </motion.article>
-        ) : phase === "race" && round ? (
+        ) : isDriving && mission ? (
           <motion.section
-            key={`race-${round.id}`}
+            key={`drive-${mission.id}`}
             initial={{ opacity: 0, y: 14 }}
             animate={{ opacity: 1, y: 0 }}
           >
@@ -458,103 +600,119 @@ export default function CarRace() {
                     <span
                       className={cn(
                         "rounded-full px-2.5 py-1 text-[10px] font-extrabold uppercase tracking-wider",
-                        round.tone,
                         "bg-[var(--tone)] text-[var(--tone-ink)]",
+                        mission.tone,
                       )}
                     >
-                      {round.languageName}
+                      {mission.language}
                     </span>
                     <span className="font-mono text-[10px] font-bold uppercase tracking-widest text-muted-foreground">
-                      Gate {currentIndex + 1} of {CAR_ROUNDS.length}
+                      Line {currentIndex + 1} of {RALLY_MISSIONS.length}
                     </span>
-                    {streak > 1 && (
-                      <span className="flex items-center gap-1 rounded-full bg-[var(--clay-butter)] px-2.5 py-1 text-[10px] font-extrabold uppercase tracking-wider text-[var(--clay-butter-ink)]">
-                        🔥 {streak} in a row
-                      </span>
-                    )}
                   </div>
                   <h1 className="mt-2 font-display text-2xl font-semibold sm:text-3xl">
-                    {round.title}
+                    {mission.title}
                   </h1>
+                  <p className="mt-1 text-sm font-semibold text-muted-foreground">
+                    {mission.goal}
+                  </p>
                 </div>
-                <div className="flex items-center gap-2">
+                <div className="flex flex-wrap items-center gap-2">
                   <div className="flex items-center gap-1.5 rounded-full bg-white/70 px-3 py-1.5">
-                    {Array.from({ length: START_TRIES }).map((_, index) => (
+                    {Array.from({ length: START_LIVES }).map((_, index) => (
                       <Wrench
                         key={index}
                         className={cn(
                           "size-3.5",
-                          index < tries
+                          index < game.lives
                             ? "text-[var(--clay-mint-ink)]"
                             : "text-muted-foreground/30",
                         )}
                       />
                     ))}
                     <span className="ml-1 text-[10px] font-extrabold uppercase tracking-wider text-muted-foreground">
-                      {tries} left
+                      {game.lives} repairs
                     </span>
                   </div>
-                  <span className="hidden items-center gap-1.5 rounded-full bg-[var(--clay-butter)] px-3 py-1.5 text-xs font-extrabold text-[var(--clay-butter-ink)] sm:flex">
-                    <Sparkles className="size-3.5" /> +{round.xp} XP
+                  <span className="rounded-full bg-[var(--clay-butter)] px-3 py-1.5 text-xs font-extrabold text-[var(--clay-butter-ink)]">
+                    +{mission.xp} XP
                   </span>
                 </div>
               </div>
 
-              <h2 className="mt-4 text-lg font-bold leading-relaxed">
-                {round.prompt}
-              </h2>
-
-              {round.code && (
-                <pre className="code-well mt-3 overflow-x-auto px-4 py-3.5 font-mono text-[13px] leading-7">
-                  {round.code}
-                </pre>
-              )}
-
-              <div className="mt-4 grid gap-2.5 sm:grid-cols-3">
-                {gates.map((gate, index) => {
-                  const used = spent.includes(gate.text);
-                  return (
-                    <button
-                      key={`${gate.text}-${index}`}
-                      type="button"
-                      onClick={() => choose(index)}
-                      disabled={used || locked}
-                      className={cn(
-                        "clay-btn flex min-h-24 flex-col items-start gap-2 rounded-2xl border border-white/60 px-3.5 py-3 text-left transition",
-                        LANE_TONES[index],
-                        used
-                          ? "bg-muted text-muted-foreground opacity-55"
-                          : lane === index
-                            ? "bg-[var(--tone)] text-[var(--tone-ink)]"
-                            : "bg-white/75 text-foreground hover:bg-white",
-                      )}
-                    >
-                      <span className="flex w-full items-center justify-between gap-2">
-                        <span className="text-[10px] font-extrabold uppercase tracking-widest opacity-65">
-                          Lane {LANE_LABELS[index]}
-                        </span>
-                        {used ? (
-                          <X className="size-3.5" />
-                        ) : (
-                          <span className="grid size-5 place-items-center rounded-full bg-white/60 text-[10px] font-extrabold">
-                            {LANE_LABELS[index]}
-                          </span>
+              {/* The coach is always visible: it tells the player exactly what to collect next. */}
+              <div className="mt-4 rounded-2xl bg-[var(--clay-ink)] p-3.5 text-white shadow-[inset_0_8px_18px_-12px_rgba(0,0,0,0.8)]">
+                <div className="flex items-center justify-between gap-2">
+                  <p className="flex items-center gap-1.5 text-[10px] font-extrabold uppercase tracking-widest text-white/55">
+                    <BookOpen className="size-3.5" /> Coach · build the line
+                  </p>
+                  <span className="font-mono text-[10px] font-bold text-white/45">
+                    {step}/{mission.tokens.length} pieces
+                  </span>
+                </div>
+                <div className="mt-2 flex flex-wrap items-center gap-1.5">
+                  {mission.tokens.map((token, index) => {
+                    const collected = index < step;
+                    const next = index === step;
+                    return (
+                      <span
+                        key={`${token}-${index}`}
+                        className={cn(
+                          "rounded-lg px-2 py-1 font-mono text-[11px] font-bold transition",
+                          collected
+                            ? "bg-[var(--clay-mint)] text-[var(--clay-mint-ink)]"
+                            : next
+                              ? "bg-[var(--clay-butter)] text-[var(--clay-butter-ink)] ring-2 ring-white/70"
+                              : "bg-white/10 text-white/45",
                         )}
+                      >
+                        {token}
                       </span>
-                      <span className="whitespace-pre-wrap font-mono text-[12px] font-bold leading-5">
-                        {gate.text}
-                      </span>
-                    </button>
-                  );
-                })}
+                    );
+                  })}
+                </div>
+                <p className="mt-2 text-xs font-bold text-white/65">
+                  {step < mission.tokens.length
+                    ? `Next piece: ${mission.tokens[step]} — steer into it on the road.`
+                    : "Line complete. Nice driving!"}
+                </p>
               </div>
 
-              <p className="mt-3 text-[11px] font-bold uppercase tracking-wider text-muted-foreground">
-                Tap a lane to steer · wrong gates cost a repair
-              </p>
+              <div className="mt-3 flex flex-wrap items-center justify-between gap-3">
+                <div className="flex items-center gap-2">
+                  <button
+                    type="button"
+                    onClick={() => moveLane(-1)}
+                    disabled={game.lane === 0}
+                    aria-label="Steer left"
+                    className="clay-btn grid size-10 place-items-center rounded-xl bg-white text-foreground disabled:opacity-35"
+                  >
+                    <ArrowLeft className="size-4" strokeWidth={2.5} />
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => moveLane(1)}
+                    disabled={game.lane === 2}
+                    aria-label="Steer right"
+                    className="clay-btn grid size-10 place-items-center rounded-xl bg-white text-foreground disabled:opacity-35"
+                  >
+                    <ArrowRight className="size-4" strokeWidth={2.5} />
+                  </button>
+                  <span className="hidden text-[11px] font-bold text-muted-foreground sm:inline">
+                    or use ← → / A D
+                  </span>
+                </div>
+                <div className="flex items-center gap-3 text-[11px] font-extrabold uppercase tracking-wider text-muted-foreground">
+                  <span className="flex items-center gap-1.5">
+                    <Gauge className="size-3.5" /> {Math.round(game.speed)} km/h
+                  </span>
+                  <span>{game.distance.toFixed(1)} km</span>
+                  <span>{game.score} pts</span>
+                </div>
+              </div>
             </div>
 
-            <div className="relative mt-4 h-[24rem] overflow-hidden rounded-[2rem] border border-white/10 bg-[var(--clay-ink)] shadow-[inset_0_10px_40px_rgba(0,0,0,0.45),0_30px_50px_-30px_rgba(40,30,70,0.7)] sm:h-[28rem]">
+            <div className="relative mt-4 h-[28rem] overflow-hidden rounded-[2rem] border border-white/10 bg-[var(--clay-ink)] shadow-[inset_0_10px_40px_rgba(0,0,0,0.45),0_30px_50px_-30px_rgba(40,30,70,0.7)] sm:h-[32rem]">
               <div className="absolute inset-x-0 top-0 h-24 bg-gradient-to-b from-[var(--clay-lilac)]/30 to-transparent" />
               <div
                 className="absolute inset-y-0 left-1/2 w-[74%] -translate-x-1/2 bg-[oklch(0.3_0.025_290)] shadow-[inset_0_0_60px_rgba(0,0,0,0.5)]"
@@ -573,11 +731,10 @@ export default function CarRace() {
               <div className="pointer-events-none absolute inset-x-0 top-0 z-10 flex items-start justify-between gap-3 bg-gradient-to-b from-[var(--clay-ink)] via-[var(--clay-ink)]/80 to-transparent p-4 pb-10">
                 <div className="flex items-center gap-1.5 rounded-full bg-white/10 px-3 py-1.5 text-[10px] font-extrabold uppercase tracking-wider text-white/70">
                   <Gauge className="size-3.5" />
-                  {speed} km/h
+                  {Math.round(game.speed)} km/h
                 </div>
                 <div className="flex items-center gap-1.5 rounded-full bg-white/10 px-3 py-1.5 text-[10px] font-extrabold uppercase tracking-wider text-white/70">
-                  <Flag className="size-3.5" />
-                  {solved * 0.4} km
+                  🐞 Dodge bugs
                 </div>
               </div>
 
@@ -586,124 +743,162 @@ export default function CarRace() {
               <div className="absolute left-[16%] bottom-28 text-2xl opacity-70">🪨</div>
               <div className="absolute right-[16%] bottom-20 text-2xl opacity-70">🌵</div>
 
-              {flash && (
+              {game.entities.map((entity) => (
+                <div
+                  key={entity.id}
+                  className="absolute z-10 -translate-x-1/2"
+                  style={{ left: `${LANE_X[entity.lane]}%`, top: `${entity.y}%` }}
+                >
+                  {entity.kind === "bug" ? (
+                    <div className="grid size-16 place-items-center rounded-full border-2 border-[var(--clay-peach)] bg-[var(--clay-peach)] text-2xl shadow-[0_8px_16px_-10px_rgba(0,0,0,0.8)]">
+                      🐞
+                    </div>
+                  ) : (
+                    <div
+                      className={cn(
+                        "w-[26vw] max-w-32 rounded-xl border px-2 py-2 text-center font-mono text-[10px] font-bold leading-4 shadow-[0_8px_16px_-10px_rgba(0,0,0,0.8)] sm:w-32 sm:text-[11px]",
+                        entity.step === step
+                          ? "border-[var(--clay-butter)] bg-[var(--clay-butter)] text-[var(--clay-butter-ink)] ring-2 ring-white/70"
+                          : "border-white/25 bg-white/90 text-foreground",
+                      )}
+                    >
+                      {entity.text}
+                    </div>
+                  )}
+                </div>
+              ))}
+
+              {game.event && (
                 <motion.div
-                  key={flash.key}
+                  key={game.event.key}
                   initial={{ opacity: 0, y: 8, scale: 0.9 }}
                   animate={{ opacity: 1, y: 0, scale: 1 }}
                   className={cn(
-                    "absolute left-1/2 top-[42%] z-30 -translate-x-1/2 whitespace-nowrap rounded-full px-4 py-2 text-xs font-extrabold uppercase tracking-wider shadow-lg",
-                    flash.positive
+                    "absolute left-1/2 top-[38%] z-30 -translate-x-1/2 whitespace-nowrap rounded-full px-4 py-2 text-xs font-extrabold uppercase tracking-wider shadow-lg",
+                    game.event.tone === "good"
                       ? "bg-[var(--clay-mint)] text-[var(--clay-mint-ink)]"
-                      : "bg-[var(--clay-peach)] text-[var(--clay-peach-ink)]",
+                      : game.event.tone === "bug"
+                        ? "bg-[var(--clay-peach)] text-[var(--clay-peach-ink)]"
+                        : "bg-[var(--clay-butter)] text-[var(--clay-butter-ink)]",
                   )}
                 >
-                  {flash.text}
+                  {game.event.text}
                 </motion.div>
               )}
 
-              <motion.div
-                className="absolute bottom-8 z-20 -translate-x-1/2"
-                animate={{ left: `${LANE_X[lane]}%` }}
-                transition={{ type: "spring", stiffness: 130, damping: 15 }}
+              <div
+                className="absolute bottom-8 z-20 -translate-x-1/2 transition-[left] duration-150"
+                style={{ left: `${LANE_X[game.lane]}%` }}
               >
                 <motion.div
-                  animate={
-                    wrongShake
-                      ? { x: [0, -7, 7, -4, 0], rotate: [0, -3, 3, 0] }
-                      : { y: [0, -2, 0] }
-                  }
-                  transition={
-                    wrongShake
-                      ? { duration: 0.45 }
-                      : {
-                          duration: 1.2,
-                          repeat: Infinity,
-                          ease: "easeInOut",
-                        }
-                  }
+                  animate={{ y: [0, -2, 0] }}
+                  transition={{ duration: 1.1, repeat: Infinity, ease: "easeInOut" }}
                 >
                   <Car />
                 </motion.div>
-              </motion.div>
+              </div>
 
               <div className="pointer-events-none absolute bottom-3 left-1/2 z-10 -translate-x-1/2 whitespace-nowrap rounded-full bg-white/10 px-3 py-1 text-[10px] font-bold uppercase tracking-widest text-white/45">
-                {lastPick ? "Car is in the selected lane" : "Choose a lane above to steer"}
+                Collect the highlighted piece · avoid bugs
               </div>
             </div>
           </motion.section>
-        ) : round ? (
+        ) : missionComplete && mission ? (
           <motion.section
-            key={`result-${round.id}`}
+            key={`result-${mission.id}`}
             initial={{ opacity: 0, y: 16 }}
             animate={{ opacity: 1, y: 0 }}
             className="clay p-7 text-center sm:p-10"
           >
-            <div
-              className={cn(
-                "clay-tile mx-auto grid size-20 place-items-center text-5xl",
-                correct ? "tone-mint" : "tone-peach",
-              )}
-            >
-              {correct ? "🏁" : "🛠️"}
+            <div className="clay-tile tone-mint mx-auto grid size-20 place-items-center text-5xl">
+              🏁
             </div>
             <h1 className="mt-5 text-3xl font-semibold sm:text-4xl">
-              {correct ? "Gate cleared!" : "Breakdown at the gate"}
+              Line compiled!
             </h1>
             <p className="mt-2 text-sm font-bold text-muted-foreground">
-              {correct
-                ? replay
-                  ? "Replay gate complete — no extra XP, but the idea is yours."
-                  : `+${round.xp} XP · ${speed} km/h and climbing`
-                : `The right gate was “${correctText}”.`}
+              {replay
+                ? "Replay complete — no extra XP, but the line is yours."
+                : `+${mission.xp} XP · ${Math.round(game.speed)} km/h`}
             </p>
 
+            <div className="mx-auto mt-6 max-w-2xl text-left">
+              <div className="code-well overflow-hidden">
+                <div className="flex items-center gap-1.5 border-b border-white/10 px-4 py-2.5">
+                  <span className="size-2.5 rounded-full bg-[oklch(0.78_0.13_25)]" />
+                  <span className="size-2.5 rounded-full bg-[oklch(0.88_0.11_95)]" />
+                  <span className="size-2.5 rounded-full bg-[oklch(0.8_0.1_165)]" />
+                  <span className="ml-auto font-mono text-[10px] font-bold uppercase tracking-widest text-white/40">
+                    {mission.language.toLowerCase()} · built on the road
+                  </span>
+                </div>
+                <pre className="overflow-x-auto px-4 py-4 font-mono text-[13px] leading-7 text-[oklch(0.94_0.02_95)]">
+                  {mission.code}
+                </pre>
+              </div>
+              <div className="clay-inset mt-3 rounded-2xl p-5">
+                <p className="text-[10px] font-extrabold uppercase tracking-widest text-muted-foreground">
+                  Why it works
+                </p>
+                <p className="mt-2 text-sm font-semibold leading-relaxed text-foreground/85">
+                  {mission.explanation}
+                </p>
+              </div>
+            </div>
+
+            <Button
+              onClick={nextMission}
+              size="lg"
+              className="clay-btn mt-6 h-12 rounded-2xl px-6 font-extrabold"
+            >
+              {currentIndex + 1 >= RALLY_MISSIONS.length
+                ? "Finish the rally"
+                : "Keep driving"}
+              <ArrowRight className="size-4" />
+            </Button>
+          </motion.section>
+        ) : missionFailed && mission ? (
+          <motion.section
+            key={`gameover-${mission.id}`}
+            initial={{ opacity: 0, y: 16 }}
+            animate={{ opacity: 1, y: 0 }}
+            className="clay p-7 text-center sm:p-10"
+          >
+            <div className="clay-tile tone-peach mx-auto grid size-20 place-items-center text-5xl">
+              🛠️
+            </div>
+            <h1 className="mt-5 text-3xl font-semibold sm:text-4xl">
+              Engine stalled
+            </h1>
+            <p className="mt-2 text-sm font-bold text-muted-foreground">
+              Too many bugs hit the car. The line is still waiting to be built.
+            </p>
             <div className="clay-inset mx-auto mt-6 max-w-2xl rounded-2xl p-5 text-left">
               <p className="text-[10px] font-extrabold uppercase tracking-widest text-muted-foreground">
-                Why it matters
+                Target line
               </p>
-              <p className="mt-2 text-sm font-semibold leading-relaxed text-foreground/85">
-                {round.explanation}
-              </p>
+              <pre className="mt-2 whitespace-pre-wrap font-mono text-sm font-bold text-[var(--clay-peach-ink)]">
+                {mission.code}
+              </pre>
             </div>
-
             <div className="mt-6 flex flex-col items-center justify-center gap-3 sm:flex-row">
-              {correct ? (
-                <Button
-                  onClick={goNext}
-                  size="lg"
-                  className="clay-btn h-12 rounded-2xl px-6 font-extrabold"
-                >
-                  {currentIndex + 1 >= CAR_ROUNDS.length
-                    ? "Finish the rally"
-                    : "Next gate"}
-                  <ArrowRight className="size-4" />
-                </Button>
-              ) : (
-                <>
-                  <Button
-                    onClick={retryGate}
-                    size="lg"
-                    className="clay-btn h-12 rounded-2xl bg-[var(--clay-peach-ink)] px-6 font-extrabold text-white hover:bg-[var(--clay-peach-ink)]"
-                  >
-                    <Wrench className="size-4" />
-                    Pit stop and retry
-                  </Button>
-                  <Button
-                    onClick={goNext}
-                    variant="outline"
-                    className="h-12 rounded-2xl border-0 bg-white px-6 font-extrabold"
-                  >
-                    Tow to next gate
-                    <ArrowRight className="size-4" />
-                  </Button>
-                </>
-              )}
+              <Button
+                onClick={retryMission}
+                size="lg"
+                className="clay-btn h-12 rounded-2xl bg-[var(--clay-peach-ink)] px-6 font-extrabold text-white hover:bg-[var(--clay-peach-ink)]"
+              >
+                <Wrench className="size-4" />
+                Pit stop and retry
+              </Button>
+              <Button
+                onClick={() => setPhase("intro")}
+                variant="outline"
+                className="h-12 rounded-2xl border-0 bg-white px-6 font-extrabold"
+              >
+                <ArrowLeft className="size-4" />
+                Back to garage
+              </Button>
             </div>
-
-            <p className="mt-5 flex items-center justify-center gap-2 text-[10px] font-extrabold uppercase tracking-wider text-muted-foreground">
-              <BookOpen className="size-3.5" /> Understanding beats speed — keep rolling.
-            </p>
           </motion.section>
         ) : null}
       </main>

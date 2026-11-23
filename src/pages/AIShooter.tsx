@@ -70,10 +70,12 @@ export default function AIShooter() {
   const [soundOn, setSoundOn] = useState(true);
   const [aim, setAim] = useState<{ x: number; y: number } | null>(null);
   const [shot, setShot] = useState<Shot | null>(null);
+  const [showGuide, setShowGuide] = useState(false);
 
   const arenaRef = useRef<HTMLDivElement>(null);
   const shotKey = useRef(0);
   const timer = useRef<number | null>(null);
+  const guideSeen = useRef(false);
 
   useEffect(() => {
     return () => {
@@ -134,6 +136,10 @@ export default function AIShooter() {
     setActiveIndex(currentIndex);
     setReplay(completedIds.includes(lesson.id));
     resetRange();
+    if (!guideSeen.current) {
+      guideSeen.current = true;
+      setShowGuide(true);
+    }
     setPhase("range");
   }
 
@@ -281,6 +287,16 @@ export default function AIShooter() {
                 );
               })}
             </div>
+            {phase === "range" && (
+              <button
+                type="button"
+                onClick={() => setShowGuide(true)}
+                className="grid size-9 place-items-center rounded-full bg-white/70 text-muted-foreground shadow-[inset_0_-2px_0_rgba(60,50,90,0.08)] transition hover:text-foreground"
+                aria-label="Show range guide"
+              >
+                <BookOpen className="size-4" />
+              </button>
+            )}
             <button
               type="button"
               onClick={() => setSoundOn((current) => !current)}
@@ -453,6 +469,49 @@ export default function AIShooter() {
                 backgroundSize: "auto, auto, 22px 22px",
               }}
             >
+              {showGuide && (
+                <div
+                  className="absolute inset-0 z-40 grid place-items-center bg-[var(--clay-ink)]/75 p-4 backdrop-blur-[2px]"
+                  onPointerDown={(event) => event.stopPropagation()}
+                >
+                  <div className="clay w-full max-w-sm p-6 text-center">
+                    <span className="clay-tile tone-lilac mx-auto grid size-14 place-items-center text-[var(--clay-lilac-ink)]">
+                      <Crosshair className="size-6" />
+                    </span>
+                    <h3 className="mt-4 font-display text-2xl font-semibold">
+                      Range guide
+                    </h3>
+                    <div className="mt-4 space-y-2 text-left">
+                      {[
+                        "Move your pointer or drag on mobile to aim.",
+                        "Read the prompt at the top of the range.",
+                        "Fire at the target that matches the prompt.",
+                        "You get 3 charges — wrong targets use one.",
+                      ].map((item, index) => (
+                        <div
+                          key={item}
+                          className="flex items-start gap-2.5 rounded-xl bg-[var(--muted)] px-3 py-2"
+                        >
+                          <span className="grid size-5 shrink-0 place-items-center rounded-full bg-white text-[10px] font-extrabold text-[var(--clay-lilac-ink)]">
+                            {index + 1}
+                          </span>
+                          <span className="text-xs font-bold text-foreground/80">
+                            {item}
+                          </span>
+                        </div>
+                      ))}
+                    </div>
+                    <Button
+                      onClick={() => setShowGuide(false)}
+                      className="clay-btn mt-5 h-11 w-full rounded-xl font-extrabold"
+                    >
+                      Got it — let me shoot
+                      <Crosshair className="size-4" />
+                    </Button>
+                  </div>
+                </div>
+              )}
+
               <div className="pointer-events-none absolute inset-x-0 top-0 z-10 bg-gradient-to-b from-[var(--clay-ink)] via-[var(--clay-ink)]/85 to-transparent p-5 pb-12">
                 <div className="flex flex-wrap items-start justify-between gap-3">
                   <div>
